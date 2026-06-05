@@ -1,0 +1,27 @@
+# Godot 4+ specific ignores
+.godot/
+/android/
+
+assets/fonts/
+assets/mesh_libraries/
+assets/meshes/
+
+items/
+
+audio/
+video/
+
+weapons/data/
+weapons/instances/
+weapons/models/
+
+ACTION_PLAN_WEBSITE.md
+export_presets.cfg
+project.godot
+
+*.uid
+*.import
+*.tscn
+*.depren
+*.lmbake
+*.tres
