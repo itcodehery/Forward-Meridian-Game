@@ -486,9 +486,9 @@ func _update_laser_visuals() -> void:
 	if not laser_mesh.visible:
 		return
 		
-	# Keeps laser flush against the environment in all states
-	var old_target = ray.target_position
-	ray.target_position = Vector3(current_target_offset.x, current_target_offset.y, -detection_range)
+	# FIX: The ray's global_basis is already rotated to point at the offset in _aim_at_position.
+	# We just need to shoot it straight down its own local Z axis so it doesn't double-offset!
+	ray.target_position = Vector3(0, 0, -detection_range)
 	ray.force_raycast_update()
 	
 	if ray.is_colliding():
@@ -496,8 +496,6 @@ func _update_laser_visuals() -> void:
 		_set_laser_length(hit_dist)
 	else:
 		_set_laser_length(detection_range)
-		
-	ray.target_position = old_target
 
 func _reset_combat_spool() -> void:
 	time_in_sight     = 0.0
@@ -535,12 +533,22 @@ func shoot() -> void:
 			func(): if is_instance_valid(flash_light): flash_light.visible = false
 		)
 
-	# Re-verify collision before applying damage
-	ray.force_raycast_update()
-	if ray.is_colliding():
-		var target = ray.get_collider()
-		if is_instance_valid(target) and target.has_method("take_damage"):
-			target.take_damage(damage)
+	# --- FIX: USE PHYSICS SERVER INSTEAD OF THE VISUAL RAYCAST ---
+	var space_state = get_world_3d().direct_space_state
+	var target_node = player.get_node_or_null("TargetPoint")
+	var base_aim = target_node.global_position if target_node else player.global_position + Vector3(0, 1.2, 0)
+	var final_aim = base_aim + current_target_offset
+	
+	var origin = ray.global_position if is_instance_valid(ray) else global_position
+	var query = PhysicsRayQueryParameters3D.create(origin, final_aim)
+	query.exclude = [self]
+	query.collision_mask = ray.collision_mask # Respects the layers set in the editor
+	
+	var result = space_state.intersect_ray(query)
+	if result and is_instance_valid(result.collider):
+		if result.collider.has_method("take_damage"):
+			result.collider.take_damage(damage)
+	# -------------------------------------------------------------
 
 	await get_tree().create_timer(current_fire_rate).timeout
 	can_shoot = true

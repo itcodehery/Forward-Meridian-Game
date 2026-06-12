@@ -6,7 +6,7 @@ var current_state: State = State.IDLE
 # --- Node References ---
 @onready var player: CharacterBody3D = get_tree().get_first_node_in_group("players")
 @onready var slots = { "slot_1": $Primary, "slot_2": $Secondary, "melee": $Melee }
-@onready var aim_cast = %AimCast_U 
+@onready var aim_cast = get_tree().get_first_node_in_group("players").get_node("Camera3D/AimCast_U")
 
 # --- Audio Layers ---
 @onready var audio_main = AudioStreamPlayer.new()
@@ -162,7 +162,7 @@ func _consume_ammo_and_heat(data: WeaponData):
 			heat_changed.emit(heat_levels[current_slot], false)
 
 func _do_hitscan(data: WeaponData):
-	var space_state = get_world_3d().direct_space_state
+	var space_state = aim_cast.get_world_3d().direct_space_state
 	var pellets = data.pellet_count if "pellet_count" in data else 1
 	var active_spread = data.base_spread
 	
@@ -192,6 +192,7 @@ func _do_hitscan(data: WeaponData):
 			
 			if result:
 				var target = result.collider
+				print("Bullet hit: ", target.name)
 				var hit_pos = result.position
 				var hit_normal = result.normal
 				var distance = global_position.distance_to(hit_pos)

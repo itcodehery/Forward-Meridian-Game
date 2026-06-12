@@ -102,9 +102,10 @@ var armor: float = 0.0
 var stamina: float = 100.0
 const STAMINA_DRAIN = 5.0
 const STAMINA_REGEN = 20.0
-var regen_timer: float = 0.0
 
 # --- Timers & Mechanics ---
+var regen_timer: float = 0.0 # Used for Stamina delay
+var combat_regen_timer: float = 0.0 # Used for Health/Armor delay
 var coyote_timer: float = 0.0
 var jump_buffer_timer: float = 0.0
 var slide_timer: float = 0.0
@@ -287,7 +288,7 @@ func _state_sprinting(delta):
 	_handle_headbob(delta)
 
 	stamina -= STAMINA_DRAIN * delta
-	regen_timer = 3.0 # Delay before regen
+	regen_timer = 2.0 # Delay before stamina regen
 	stamina_changed.emit(clamp(stamina, 0.0, 100.0))
 
 	if not is_on_floor(): _change_state(State.IN_AIR)
@@ -540,30 +541,30 @@ func fire_grapple():
 	var space_state = get_world_3d().direct_space_state
 	var aim_dir = -main_camera.global_transform.basis.z
 	var start = main_camera.global_position
+	var max_reach_point = start + aim_dir * grapple_max_dist
 	
 	# Cast the ray forward to check for surfaces
-	var query = PhysicsRayQueryParameters3D.create(start, start + aim_dir * grapple_max_dist, 1)
+	var query = PhysicsRayQueryParameters3D.create(start, max_reach_point, 1)
 	query.exclude = [self.get_rid()]
 	var result = space_state.intersect_ray(query)
 	
-	# ONLY activate the grapple if the raycast actually hit a surface
+	# If we hit a wall, hook the wall. If we hit nothing, hook the air at max distance!
 	if result:
 		grapple_point = result.position
-		grapple_cooldown = grapple_cooldown_time
-		grapple_rope.visible = true
-		
-		# Give the player a slight upward boost when the grapple connects
-		velocity.y += 5.0 
-		
-		if grapple_snd: 
-			grapple_snd.play()
-			
-		_change_state(State.GRAPPLING)
 	else:
-		# The ray hit nothing (plain air). 
-		# The grapple fails to fire. 
-		# Optional: You can play a "dry fire" or "click" error sound right here!
-		pass
+		grapple_point = max_reach_point
+		
+	# Always activate the grapple now!
+	grapple_cooldown = grapple_cooldown_time
+	grapple_rope.visible = true
+	
+	# Give the player a slight upward boost to start the swing
+	velocity.y += 5.0 
+	
+	if grapple_snd: 
+		grapple_snd.play()
+		
+	_change_state(State.GRAPPLING)
 
 func break_grapple():
 	if is_instance_valid(grapple_rope): grapple_rope.visible = false
@@ -652,8 +653,79 @@ func sync_viewmodel_camera():
 	viewmodel_camera.global_transform = main_camera.global_transform
 	viewmodel_camera.fov = main_camera.fov
 
-func _handle_regen(delta: float):
-	pass # Hook your regen logic back up here if needed!
-
 func _on_interactable_entered(body): pass # Simplified via raycast updates
 func _on_interactable_exited(body): pass
+
+# ─────────────────────────────────────────────
+# COMBAT & REGEN LOGIC
+# ─────────────────────────────────────────────
+func take_damage(amount: float) -> void:
+	if health <= 0: return # Already dead
+	
+	# Apply damage to armor first, spill over to health
+	if armor > 0:
+		armor -= amount
+		if armor < 0:
+			health += armor # Armor went below 0, subtract the remainder from health
+			armor = 0
+	else:
+		health -= amount
+
+	# Update UI
+	health_changed.emit(health)
+	armor_changed.emit(armor)
+
+	# Flinch the camera
+	trauma += 0.35
+	trauma = clamp(trauma, 0.0, 1.0)
+	
+	# Reset combat regen timer so they don't heal while being shot
+	combat_regen_timer = 5.0 
+
+	if health <= 0:
+		die()
+
+func _handle_regen(delta: float):
+	if health <= 0: return # Don't regen a corpse
+	
+	if combat_regen_timer > 0:
+		combat_regen_timer -= delta
+		
+		# Stop looping sounds if we took damage and the timer resets
+		if armor_snd and armor_snd.playing: armor_snd.stop()
+		if health_snd and health_snd.playing: health_snd.stop()
+		
+	else:
+		var is_healing = false
+		
+		# 1. Regenerate Health first (if below max)
+		if health < max_health:
+			health = move_toward(health, max_health, 10.0 * delta)
+			health_changed.emit(health)
+			is_healing = true
+			if health_snd and not health_snd.playing: health_snd.play()
+			
+		# 2. Regenerate Armor next (if health is full)
+		elif armor < max_armor:
+			if health_snd and health_snd.playing: health_snd.stop()
+			armor = move_toward(armor, max_armor, 25.0 * delta)
+			armor_changed.emit(armor)
+			is_healing = true
+			if armor_snd and not armor_snd.playing: armor_snd.play()
+			
+		# 3. Fully healed, silence the audio
+		if not is_healing:
+			if armor_snd and armor_snd.playing: armor_snd.stop()
+			if health_snd and health_snd.playing: health_snd.stop()
+
+func die() -> void:
+	has_control = false
+	health = 0
+	health_changed.emit(health)
+	
+	# Transition to your death screen
+	if DEATH_SCREEN:
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		get_tree().change_scene_to_packed(DEATH_SCREEN)
+	else:
+		print("Player died, but no DEATH_SCREEN packed scene is set!")

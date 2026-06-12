@@ -2,7 +2,7 @@ shader_type spatial;
 
 uniform float min_height = 0.0;
 uniform float max_height = 2.0;
-uniform vec3 low_color : source_color = vec3(0.9, 0.56, 0.2);
+uniform vec3 low_color : source_color = vec3(0.4, 0.26, 0.2);
 uniform vec3 high_color : source_color = vec3(0.9, 0.8, 0.8);
 
 varying float world_y;
