@@ -28,6 +28,8 @@ extends CanvasLayer
 @onready var ui_audio = $AudioStreamPlayer2D
 
 var in_logs_menu: bool = false
+var in_controls_menu: bool = false
+@onready var controls_menu_state = Control.new()
 
 func _ready():
 	visible = false
@@ -40,13 +42,29 @@ func _ready():
 	# Initialize UI
 	_setup_logs()
 	
+	# Setup Controls Menu
+	controls_menu_state.set_script(preload("res://ui/menus/controls_menu.gd"))
+	controls_menu_state.name = "ControlsMenuState"
+	controls_menu_state.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	$BackgroundImage.add_child(controls_menu_state)
+	controls_menu_state.hide()
+	
+	# Add Controls Button dynamically
+	var controls_btn = log_button_scene.instantiate()
+	controls_btn.text_label = "CONTROLS"
+	var menu_vbox = $BackgroundImage/MainMenuState/MenuVBox
+	menu_vbox.add_child(controls_btn)
+	# Spacer(0), Resume(1), Controls(2), Logs(3)
+	menu_vbox.move_child(controls_btn, 3) 
+	controls_btn.pressed.connect(open_controls_menu)
+	
 	# Ensure we start on the main menu
 	_reset_menu_state()
 
 func _unhandled_input(event):
 	if event.is_action_pressed("ui_cancel"):
-		# If we are in the logs, Escape should take us back to the main menu first
-		if in_logs_menu:
+		# If we are in the logs or controls, Escape should take us back to the main menu first
+		if in_logs_menu or in_controls_menu:
 			_reset_menu_state()
 		else:
 			toggle_pause()
@@ -85,13 +103,23 @@ func _toggle_hud(show_hud: bool):
 
 func _reset_menu_state():
 	in_logs_menu = false
+	in_controls_menu = false
 	logs_menu_state.hide()
+	if is_instance_valid(controls_menu_state):
+		controls_menu_state.hide()
 	main_menu_state.show()
 
 func open_logs_menu():
 	in_logs_menu = true
 	main_menu_state.hide()
+	if is_instance_valid(controls_menu_state): controls_menu_state.hide()
 	logs_menu_state.show()
+
+func open_controls_menu():
+	in_controls_menu = true
+	main_menu_state.hide()
+	logs_menu_state.hide()
+	controls_menu_state.show()
 
 func _update_bottom_labels():
 	var active_level = get_tree().current_scene

@@ -18,6 +18,7 @@ var current_state: State = State.IDLE
 @export var max_health: float = 100.0
 @export var max_armor: float = 100.0
 @export var mouse_sensitivity: float = 0.002
+@export var combat_regen_delay: float = 5.0 # <--- ADD THIS LINE
 
 @export_category("Grenade")
 @export var grenade_scene: PackedScene
@@ -95,6 +96,7 @@ var camera_base_pitch: float = 0.0
 @onready var pickup_area      = $PickupArea
 @onready var ui               = get_tree().get_first_node_in_group("interface")
 @onready var arc_dots         = $Camera3D/ThrowArc/ArcDots
+@onready var weapon_viewport   = $Camera3D/CanvasLayer/SubViewportContainer/SubViewport
 
 # --- Stats ---
 var health: float = 100.0
@@ -148,6 +150,8 @@ const DEATH_SCREEN = preload("res://levels/death_screen.tscn")
 func _ready():
 	noise.seed = randi()
 	noise.noise_type = FastNoiseLite.TYPE_SIMPLEX
+	
+	weapon_viewport.world_3d = get_viewport().world_3d
 
 	health = max_health
 	armor  = max_armor
@@ -164,6 +168,15 @@ func _ready():
 		grapple_rope = grapple_scene.instantiate()
 		get_tree().root.call_deferred("add_child", grapple_rope)
 		grapple_rope.visible = false
+		
+	# Fix Viewmodel Lighting: Dedicated light so it's never pitch black!
+	var vm_light = DirectionalLight3D.new()
+	vm_light.light_cull_mask = 2 # Only illuminate Layer 2
+	vm_light.sky_mode = DirectionalLight3D.SKY_MODE_LIGHT_ONLY
+	vm_light.light_energy = 0.8
+	vm_light.rotation_degrees = Vector3(-45, -30, 0) # Angled for good shading
+	viewmodel_camera.add_child(vm_light)
+
 
 # ─────────────────────────────────────────────
 # INPUT (Single-Press Actions)
@@ -666,7 +679,7 @@ func take_damage(amount: float) -> void:
 	if armor > 0:
 		armor -= amount
 		if armor < 0:
-			health += armor # Armor went below 0, subtract the remainder from health
+			health += armor 
 			armor = 0
 	else:
 		health -= amount
@@ -679,8 +692,8 @@ func take_damage(amount: float) -> void:
 	trauma += 0.35
 	trauma = clamp(trauma, 0.0, 1.0)
 	
-	# Reset combat regen timer so they don't heal while being shot
-	combat_regen_timer = 5.0 
+	# Reset combat regen timer using the custom delay
+	combat_regen_timer = combat_regen_delay # <--- CHANGE THIS LINE
 
 	if health <= 0:
 		die()
@@ -717,6 +730,22 @@ func _handle_regen(delta: float):
 		if not is_healing:
 			if armor_snd and armor_snd.playing: armor_snd.stop()
 			if health_snd and health_snd.playing: health_snd.stop()
+
+func heal(amount: float) -> void:
+	# Don't heal if the player is dead or already at max health
+	if health <= 0 or health >= max_health: 
+		return 
+		
+	# Add the health and clamp it so it doesn't exceed the maximum
+	health += amount
+	health = min(health, max_health)
+	
+	# Update the UI
+	health_changed.emit(health)
+	
+	# Optional: Play the health sound effect as audio feedback!
+	if health_snd and not health_snd.playing:
+		health_snd.play()
 
 func die() -> void:
 	has_control = false

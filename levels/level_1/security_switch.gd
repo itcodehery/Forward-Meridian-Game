@@ -46,6 +46,8 @@ func interact(_player):
 		target_door.unlock_security()
 	else:
 		push_warning("SecuritySwitch: No target_door assigned!")
+		
+	set_script(null)
 
 ## Called by the player's PickupArea to show the prompt
 func get_interact_text() -> String:

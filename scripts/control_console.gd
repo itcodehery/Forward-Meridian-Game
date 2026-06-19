@@ -38,3 +38,4 @@ func interact(_player):
 	if quadrant_door and quadrant_door.has_method("unlock_quadrant"):
 		quadrant_door.unlock_quadrant()
 		
+	set_script(null)

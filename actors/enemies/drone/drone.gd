@@ -9,7 +9,7 @@ extends CharacterBody3D
 #  EXPORTS
 # ---------------------------------------------------------------------------
 @export_group("Combat Stats")
-@export var health: float          = 150.0
+@export var health: float          = 60.0
 @export var damage: float          = 3.0
 
 @export_group("Fire Rate / Windup")

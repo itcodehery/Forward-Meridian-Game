@@ -30,6 +30,7 @@ extends Node3D
 
 
 func _ready():
+	print(get_viewport().world_3d)
 	# 1. Setup Atmosphere
 	_setup_background_music()
 

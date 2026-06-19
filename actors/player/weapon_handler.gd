@@ -121,16 +121,35 @@ func _handle_idle_inputs(data: WeaponData):
 	if wants_to_shoot:
 		if get_current_mag() <= 0 and not data.is_melee:
 			_play_empty_click(data)
+			action_timer = 0.2 # Prevent spamming the empty click sound
 		else:
-			shoot()
+			# Kick off the firing sequence
+			_start_firing_sequence(data)
+			
+func _start_firing_sequence(data: WeaponData):
+	current_state = State.FIRING
+	
+	if data.fire_mode == WeaponData.FireMode.BURST:
+		# Lock the action timer so the player can't shoot again until the burst finishes
+		var total_burst_time = (data.burst_count * data.burst_delay) + data.fire_rate
+		action_timer = total_burst_time
+		
+		for i in range(data.burst_count):
+			if get_current_mag() <= 0: break # Stop bursting if we run out of ammo mid-burst
+			shoot(data)
+			await get_tree().create_timer(data.burst_delay).timeout
+			
+	else:
+		# For SEMI, AUTO, BEAM, and PROJECTILE, just shoot once per trigger pull/frame
+		action_timer = data.fire_rate
+		shoot(data)
 
 # ─────────────────────────────────────────────
 # FIRING MECHANICS
 # ─────────────────────────────────────────────
-func shoot():
-	var data = get_current_data()
-	current_state = State.FIRING
-	action_timer = data.fire_rate
+func shoot(data: WeaponData):
+	# Removed the State.FIRING and action_timer lines from here, 
+	# they are now handled by _start_firing_sequence!
 	
 	_consume_ammo_and_heat(data)
 	_do_effects(data)
@@ -275,13 +294,20 @@ func _process_spring_physics(delta: float):
 	var stiffness = data.spring_stiffness if data else 100.0
 	var damping = data.spring_damping if data else 10.0
 	
+	# SAFEGUARD: Cap the delta so frame spikes don't cause the math to explode into infinity
+	var safe_delta = min(delta, 0.016)
+	
 	var force_rot = (-stiffness * recoil_rot) - (damping * recoil_rot_vel)
-	recoil_rot_vel += force_rot * delta
-	recoil_rot += recoil_rot_vel * delta
+	recoil_rot_vel += force_rot * safe_delta
+	recoil_rot += recoil_rot_vel * safe_delta
 	
 	var force_pos = (-stiffness * recoil_pos) - (damping * recoil_pos_vel)
-	recoil_pos_vel += force_pos * delta
-	recoil_pos += recoil_pos_vel * delta
+	recoil_pos_vel += force_pos * safe_delta
+	recoil_pos += recoil_pos_vel * safe_delta
+
+	# HARD CLAMP: Prevent the gun from ever turning into a NaN black hole again
+	recoil_rot = recoil_rot.clamp(Vector3(-2, -2, -2), Vector3(2, 2, 2))
+	recoil_pos = recoil_pos.clamp(Vector3(-2, -2, -2), Vector3(2, 2, 2))
 
 func _process_sway_and_bob(delta: float):
 	breathe_time += delta * 1.5
@@ -509,10 +535,6 @@ func _set_layer_recursive(node: Node, layer: int):
 	if node is VisualInstance3D:
 		node.layers = 0 
 		node.set_layer_mask_value(layer, true) 
-		if node is MeshInstance3D:
-			var outline_mat = preload("res://weapons/comic_outline_mat.tres")
-			for i in range(node.mesh.get_surface_count()):
-				var active_mat = node.get_active_material(i)
-				if active_mat: active_mat.next_pass = outline_mat
+		
 	for child in node.get_children():
 		_set_layer_recursive(child, layer)
