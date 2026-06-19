@@ -14,6 +14,7 @@ var prompt_text: String = ""
 var hold_time: float = 0.0
 
 @onready var visual_parent = $VisualParent
+@export_multiline var lore_text: String = ""
 
 # Animation Settings
 var t_bob: float = 0.0

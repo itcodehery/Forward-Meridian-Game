@@ -149,6 +149,10 @@ func create_checkpoint() -> void:
 		game_data.player_stats.pos_y = player.global_position.y
 		game_data.player_stats.pos_z = player.global_position.z
 		
+		var weapon_handler = player.get_node_or_null("Camera3D/CanvasLayer/SubViewportContainer/SubViewport/ViewModelCamera/WeaponHandler")
+		if weapon_handler:
+			game_data["inventory"] = weapon_handler.export_save_data()
+		
 		# False means we overwrite the file we are currently playing on
 		save_game(false) 
 		print("Auto-Checkpoint Created!")

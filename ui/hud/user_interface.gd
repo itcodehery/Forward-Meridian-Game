@@ -62,7 +62,53 @@ func _ready():
 	status_text.modulate.a = 0.0
 	add_to_group("interface")
 	
+	_setup_scanner_ui()
+	
 	call_deferred("initialize_ui")
+
+var scanner_panel: Panel
+var scanner_label: Label
+
+func _setup_scanner_ui():
+	scanner_panel = Panel.new()
+	scanner_panel.set_anchors_and_offsets_preset(Control.PRESET_RIGHT_WIDE)
+	scanner_panel.custom_minimum_size = Vector2(450, 0)
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0.0, 0.1, 0.2, 0.75)
+	style.border_width_left = 6
+	style.border_color = Color(0.0, 0.8, 1.0, 0.9)
+	scanner_panel.add_theme_stylebox_override("panel", style)
+	
+	var margin = MarginContainer.new()
+	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	margin.add_theme_constant_override("margin_left", 30)
+	margin.add_theme_constant_override("margin_right", 30)
+	margin.add_theme_constant_override("margin_top", 40)
+	margin.add_theme_constant_override("margin_bottom", 40)
+	scanner_panel.add_child(margin)
+	
+	scanner_label = Label.new()
+	scanner_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	scanner_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	scanner_label.add_theme_font_size_override("font_size", 22)
+	margin.add_child(scanner_label)
+	
+	%HUD.add_child(scanner_panel)
+	scanner_panel.hide()
+
+func show_scanner(is_scanning: bool, lore_text: String):
+	if not scanner_panel: return
+	
+	if is_scanning:
+		scanner_panel.show()
+		if lore_text == "":
+			scanner_label.text = "SCANNING...\n\nNO DATA DETECTED"
+			scanner_panel.get_theme_stylebox("panel").border_color = Color(0.5, 0.5, 0.5, 0.5)
+		else:
+			scanner_label.text = "DECRYPTING TARGET...\n\n" + lore_text
+			scanner_panel.get_theme_stylebox("panel").border_color = Color(0.0, 0.8, 1.0, 0.9)
+	else:
+		scanner_panel.hide()
 
 #func _notification(what):
 	##if what == NOTIFICATION_WM_SIZE_CHANGED:

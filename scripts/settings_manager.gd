@@ -4,9 +4,9 @@ const CONFIG_PATH = "user://controls.cfg"
 
 var configurable_actions = [
 	"ui_up", "ui_down", "ui_left", "ui_right", "ui_crouch",
-	"weapon_1", "weapon_2", "weapon_3", "drop_weapon",
+	"switch_weapon", "melee_strike", "drop_weapon",
 	"fire", "reload", "interact", "ads",
-	"grapple", "grenade", "toggle_inventory"
+	"grapple", "grenade", "toggle_inventory", "scan"
 ]
 
 func _ready():

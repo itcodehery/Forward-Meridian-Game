@@ -130,7 +130,23 @@ func _spawn_entities():
 				print("Director: Spawned Turret at ", marker.name, " with rotation: ", marker.rotation_degrees)
 
 func _sync_level_state():
-	pass 
+	var player = get_tree().get_first_node_in_group("players")
+	if player:
+		# Apply loaded position if we have a valid saved position
+		if SaveManager.game_data.player_stats.pos_x != 0 or SaveManager.game_data.player_stats.pos_y != 0 or SaveManager.game_data.player_stats.pos_z != 0:
+			player.global_position = Vector3(
+				SaveManager.game_data.player_stats.pos_x,
+				SaveManager.game_data.player_stats.pos_y,
+				SaveManager.game_data.player_stats.pos_z
+			)
+			player.health = SaveManager.game_data.player_stats.health
+			player.armor = SaveManager.game_data.player_stats.armor
+			
+		# Apply inventory
+		if SaveManager.game_data.has("inventory"):
+			var weapon_handler = player.get_node_or_null("Camera3D/CanvasLayer/SubViewportContainer/SubViewport/ViewModelCamera/WeaponHandler")
+			if weapon_handler:
+				weapon_handler.import_save_data(SaveManager.game_data["inventory"])
 
 func _on_objective_updated(_text):
 	print("on_objective_updated() called")

@@ -143,6 +143,7 @@ var _fov_velocity_offset: float = 0.0
 var _fov_sprint_pulse_cur: float = 0.0
 var _last_crosshair_state = ""
 const DEATH_SCREEN = preload("res://levels/death_screen.tscn")
+var scanner_cast: RayCast3D
 
 # ─────────────────────────────────────────────
 # READY
@@ -163,6 +164,12 @@ func _ready():
 
 	pickup_area.body_entered.connect(_on_interactable_entered)
 	pickup_area.body_exited.connect(_on_interactable_exited)
+	
+	scanner_cast = RayCast3D.new()
+	scanner_cast.target_position = Vector3(0, 0, -10)
+	scanner_cast.collide_with_areas = true
+	scanner_cast.collide_with_bodies = true
+	main_camera.add_child(scanner_cast)
 
 	if grapple_scene:
 		grapple_rope = grapple_scene.instantiate()
@@ -201,9 +208,8 @@ func _unhandled_input(event):
 		fire_grapple()
 
 	# Weapons
-	if event.is_action_pressed("weapon_1"):    weapon_handler.switch_to("slot_1")
-	if event.is_action_pressed("weapon_2"):    weapon_handler.switch_to("slot_2")
-	if event.is_action_pressed("weapon_3"):    weapon_handler.switch_to("melee")
+	if event.is_action_pressed("switch_weapon"): weapon_handler.toggle_weapon()
+	if event.is_action_pressed("melee_strike"):  weapon_handler.quick_melee()
 	if event.is_action_pressed("drop_weapon"): weapon_handler.drop_current_weapon()
 	if event.is_action_pressed("reload"):      weapon_handler.begin_reload()
 
@@ -229,6 +235,21 @@ func _physics_process(delta: float) -> void:
 		if arc_dots: arc_dots.visible = false
 	else:
 		if arc_dots: arc_dots.visible = false
+
+	# Scanner Input
+	if Input.is_action_pressed("scan"):
+		var ui_node = get_tree().get_first_node_in_group("interface")
+		if ui_node and ui_node.has_method("show_scanner"):
+			var lore_text = ""
+			if scanner_cast.is_colliding():
+				var collider = scanner_cast.get_collider()
+				if collider and "lore_text" in collider:
+					lore_text = collider.lore_text
+			ui_node.show_scanner(true, lore_text)
+	else:
+		var ui_node = get_tree().get_first_node_in_group("interface")
+		if ui_node and ui_node.has_method("show_scanner"):
+			ui_node.show_scanner(false, "")
 
 	is_ads = Input.is_action_pressed("ads")
 	weapon_handler.set_ads(is_ads)
@@ -610,8 +631,22 @@ func throw_grenade():
 	if current_recharge_timer <= 0: current_recharge_timer = grenade_recharge_time 
 	var nade = grenade_scene.instantiate()
 	get_tree().root.add_child(nade)
-	nade.global_position = $Camera3D.global_position
-	nade.linear_velocity = (-$Camera3D.global_transform.basis.z * throw_force) + (Vector3.UP * throw_upward_force)
+	
+	# Spawn ahead of the camera so it doesn't clip into the player's body
+	nade.global_position = $Camera3D.global_position - ($Camera3D.global_transform.basis.z * 1.5)
+	
+	var throw_dir = -$Camera3D.global_transform.basis.z
+	nade.linear_velocity = (throw_dir * throw_force) + (Vector3.UP * throw_upward_force)
+	
+	# Add some randomized spin
+	nade.angular_velocity = Vector3(randf_range(-5.0, 5.0), randf_range(-5.0, 5.0), randf_range(-5.0, 5.0))
+	
+	if nade is RigidBody3D:
+		nade.continuous_cd = true
+		var phys_mat = PhysicsMaterial.new()
+		phys_mat.bounce = 0.2
+		phys_mat.friction = 0.8
+		nade.physics_material_override = phys_mat
 
 # ─────────────────────────────────────────────
 # INTERACTION & UTILITY

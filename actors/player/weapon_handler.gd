@@ -59,6 +59,8 @@ var is_crouching: bool = false
 
 # --- Timers ---
 var action_timer: float = 0.0 
+var is_quick_meleeing: bool = false
+var pre_melee_slot: String = "slot_1"
 
 func _ready():
 	add_child(audio_main)
@@ -69,7 +71,7 @@ func _ready():
 		ammo_pools[type] = WeaponData.get_default_reserve(type)
 
 	refresh_weapon_visuals()
-	call_deferred("switch_to", "melee")
+	call_deferred("switch_to", "slot_1")
 
 func update_sway_input(relative_input: Vector2):
 	mouse_input = relative_input
@@ -105,7 +107,7 @@ func _physics_process(delta: float):
 			_handle_idle_inputs(data)
 
 func _handle_idle_inputs(data: WeaponData):
-	if is_sprinting: return
+	if is_sprinting or is_quick_meleeing: return
 	if current_slot in overheat_timers and overheat_timers[current_slot] > 0.0: return 
 	
 	if not data.is_melee and not data.uses_battery and get_current_mag() <= 0 and get_current_reserve() > 0:
@@ -356,8 +358,52 @@ func _process_sway_and_bob(delta: float):
 # ─────────────────────────────────────────────
 # WEAPON SWITCHING & RELOADING
 # ─────────────────────────────────────────────
+func toggle_weapon():
+	if current_state == State.EQUIPPING or is_quick_meleeing: return
+	if current_slot == "slot_1" and slot_2_data != null:
+		switch_to("slot_2")
+	elif current_slot == "slot_2" and slot_1_data != null:
+		switch_to("slot_1")
+
+func quick_melee():
+	if is_quick_meleeing or not melee_data: return
+	if current_state == State.RELOADING: return 
+	
+	is_quick_meleeing = true
+	pre_melee_slot = current_slot
+	current_slot = "melee"
+	
+	# Instantly hide guns, show knife
+	for s in slots.keys(): slots[s].visible = (s == "melee")
+	
+	# Play sound
+	if melee_data.fire_sound:
+		audio_main.stream = melee_data.fire_sound
+		audio_main.pitch_scale = randf_range(0.9, 1.1)
+		audio_main.play()
+		
+	# Procedural Stab Animation (Massive forward positional recoil)
+	recoil_pos_vel.z -= 150.0
+	recoil_rot_vel.x -= 80.0 # Twist it down slightly
+	
+	# Hitscan damage
+	_do_hitscan(melee_data)
+	
+	# Wait for animation to finish, then snap back
+	await get_tree().create_timer(0.4).timeout
+	
+	is_quick_meleeing = false
+	current_slot = pre_melee_slot
+	for s in slots.keys(): slots[s].visible = (s == current_slot)
+	
+	var cur_data = get_current_data()
+	if cur_data:
+		weapon_changed.emit(cur_data.name, cur_data.is_melee, cur_data.weapon_icon)
+		if cur_data.crosshair: crosshair_updated.emit(cur_data.crosshair)
+	update_ui_ammo()
+
 func switch_to(slot_name):
-	if current_state == State.EQUIPPING or slot_name == current_slot: return 
+	if current_state == State.EQUIPPING or is_quick_meleeing or slot_name == current_slot: return  
 
 	var target_data = slot_1_data if slot_name == "slot_1" else (slot_2_data if slot_name == "slot_2" else melee_data)
 	if target_data == null and slot_name != "melee": return 
@@ -418,8 +464,6 @@ func equip_new_weapon(new_data: WeaponData, starting_mag: int = -1):
 	if new_data.is_melee:
 		melee_data = new_data
 		refresh_weapon_visuals()
-		current_slot = "" 
-		switch_to("melee")
 		return
 		
 	var target_slot = ""
@@ -538,3 +582,45 @@ func _set_layer_recursive(node: Node, layer: int):
 		
 	for child in node.get_children():
 		_set_layer_recursive(child, layer)
+
+# ─────────────────────────────────────────────
+# SAVE & LOAD
+# ─────────────────────────────────────────────
+func export_save_data() -> Dictionary:
+	return {
+		"slot_1_path": slot_1_data.resource_path if slot_1_data else "",
+		"slot_2_path": slot_2_data.resource_path if slot_2_data else "",
+		"melee_path": melee_data.resource_path if melee_data else "",
+		"mags": mags.duplicate(),
+		"ammo_pools": ammo_pools.duplicate(),
+		"current_slot": current_slot
+	}
+
+func import_save_data(data: Dictionary):
+	if data.has("slot_1_path") and data["slot_1_path"] != "":
+		slot_1_data = load(data["slot_1_path"])
+	else:
+		slot_1_data = null
+		
+	if data.has("slot_2_path") and data["slot_2_path"] != "":
+		slot_2_data = load(data["slot_2_path"])
+	else:
+		slot_2_data = null
+		
+	if data.has("melee_path") and data["melee_path"] != "":
+		melee_data = load(data["melee_path"])
+	else:
+		melee_data = null
+		
+	if data.has("mags"): mags = data["mags"].duplicate()
+	if data.has("ammo_pools"): ammo_pools = data["ammo_pools"].duplicate()
+	
+	refresh_weapon_visuals()
+	
+	if data.has("current_slot") and data["current_slot"] != "":
+		var target_slot = data["current_slot"]
+		current_slot = "" # Force switch
+		call_deferred("switch_to", target_slot)
+	else:
+		current_slot = ""
+		call_deferred("switch_to", "slot_1")
