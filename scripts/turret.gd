@@ -371,9 +371,11 @@ func shoot() -> void:
 		muzzle_flash.emitting = true
 	if flash_light:
 		flash_light.visible = true
-		get_tree().create_timer(0.05).timeout.connect(
-			func(): if is_instance_valid(flash_light): flash_light.visible = false
-		)
+		var tree = get_tree()
+		if tree:
+			tree.create_timer(0.05).timeout.connect(
+				func(): if is_instance_valid(flash_light): flash_light.visible = false
+			)
 	if shoot_sound:
 		shoot_sound.pitch_scale = randf_range(0.9, 1.1)
 		shoot_sound.play()
@@ -385,7 +387,9 @@ func shoot() -> void:
 
 	shots_fired += 1
 
-	await get_tree().create_timer(current_fire_rate).timeout
+	var tree = get_tree()
+	if not tree: return
+	await tree.create_timer(current_fire_rate).timeout
 
 	if shots_fired >= shots_before_overheat:
 		_enter_cooldown()
@@ -461,7 +465,7 @@ func _turn_into_debris(mesh_node: MeshInstance3D, impulse: Vector3) -> void:
 	
 	# Automatically size the collision box based on the size of your Blender mesh!
 	if mesh_node.mesh:
-		shape.size = mesh_node.mesh.get_aabb().size
+		shape.size = mesh_node.mesh.get_aabb().size * 0.8  # Slightly smaller to prevent hovering
 		
 	col.shape = shape
 	rb.add_child(col)
@@ -485,10 +489,14 @@ func _turn_into_debris(mesh_node: MeshInstance3D, impulse: Vector3) -> void:
 	
 	# 5. Snap the RigidBody to where the mesh originally was, and apply the pop force
 	rb.global_transform = saved_global_transform
-	rb.apply_impulse(impulse, Vector3(randf_range(-0.5, 0.5), randf_range(-0.5, 0.5), 0))
+	var gentle_impulse = Vector3(randf_range(-1.5, 1.5), 2.0, randf_range(-1.5, 1.5))
+	rb.apply_impulse(gentle_impulse, Vector3(randf_range(-0.2, 0.2), randf_range(-0.2, 0.2), 0))
+	rb.apply_torque_impulse(Vector3(randf_range(-2, 2), randf_range(-1, 1), randf_range(-2, 2)))
 	
-	# Optional cleanup: Delete the debris after 10 seconds so it doesn't clutter the map
-	get_tree().create_timer(10.0).timeout.connect(rb.queue_free)
+	# Clean up debris later
+	var tree = get_tree()
+	if tree:
+		tree.create_timer(10.0).timeout.connect(rb.queue_free)
 
 func explode() -> void:
 	state = State.DEAD

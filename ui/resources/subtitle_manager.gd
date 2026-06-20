@@ -11,8 +11,10 @@ func _ready():
 	# Connect the timer so it clears the screen when time runs out
 	display_timer.timeout.connect(_on_timer_timeout)
 
-# The magic function any script in your game can call
 func show_subtitle(speaker: String, text: String, duration: float = 3.0):
+	if not SettingsManager.subtitles_enabled:
+		return
+		
 	visible = true
 	
 	# Using BBCode to make the speaker's name bold and blue!

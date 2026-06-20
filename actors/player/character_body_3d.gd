@@ -72,6 +72,10 @@ var current_state: State = State.IDLE
 @export var grapple_speed: float = 28.0
 @export var grapple_cooldown_time: float = 10.0
 
+@export_category("Double Jump")
+@export var double_jump_velocity: float = 5.5
+@export var double_jump_cooldown_time: float = 6.0
+
 # ─────────────────────────────────────────────
 # STATE VARIABLES & REFERENCES
 # ─────────────────────────────────────────────
@@ -101,9 +105,12 @@ var camera_base_pitch: float = 0.0
 # --- Stats ---
 var health: float = 100.0
 var armor: float = 0.0
+var active_healing_pool: float = 0.0
 var stamina: float = 100.0
 const STAMINA_DRAIN = 5.0
 const STAMINA_REGEN = 20.0
+
+var unlocked_keys: Array[String] = []
 
 # --- Timers & Mechanics ---
 var regen_timer: float = 0.0 # Used for Stamina delay
@@ -120,6 +127,9 @@ var current_recharge_timer: float = 0.0
 var grapple_cooldown: float = 0.0
 var grapple_point: Vector3 = Vector3.ZERO
 var grapple_rope: Node3D
+
+var double_jump_cooldown: float = 0.0
+var can_double_jump: bool = false
 
 var is_ads: bool = false
 var has_control: bool = true
@@ -237,19 +247,40 @@ func _physics_process(delta: float) -> void:
 		if arc_dots: arc_dots.visible = false
 
 	# Scanner Input
+	# Scanner Input
 	if Input.is_action_pressed("scan"):
 		var ui_node = get_tree().get_first_node_in_group("interface")
 		if ui_node and ui_node.has_method("show_scanner"):
-			var lore_text = ""
+			var scanner_data = {}
 			if scanner_cast.is_colliding():
 				var collider = scanner_cast.get_collider()
-				if collider and "lore_text" in collider:
-					lore_text = collider.lore_text
-			ui_node.show_scanner(true, lore_text)
+				if collider:
+					if "weapon_data" in collider and collider.weapon_data != null:
+						var w_data = collider.weapon_data
+						scanner_data["title"] = w_data.name
+						scanner_data["description"] = w_data.lore_description
+						scanner_data["icon"] = w_data.weapon_icon
+						
+						var ammo_str = "KINETIC"
+						if w_data.ammo_type == 3: ammo_str = "ENERGY" # AmmoType.ENERGY
+						elif w_data.ammo_type == 2: ammo_str = "BUCKSHOT"
+						elif w_data.ammo_type == 4: ammo_str = "HIGH-CALIBER"
+						elif w_data.ammo_type == 5: ammo_str = "EXPLOSIVE"
+						elif w_data.ammo_type == 6: ammo_str = "N/A"
+						
+						scanner_data["details"] = "DAMAGE TYPE: " + ammo_str + " | MAX RESERVE: " + str(w_data.reserve_max)
+					
+					elif "lore_text" in collider:
+						if "lore_title" in collider: scanner_data["title"] = collider.lore_title
+						if "lore_text" in collider: scanner_data["description"] = collider.lore_text
+						if "lore_icon" in collider: scanner_data["icon"] = collider.lore_icon
+						if "lore_details" in collider: scanner_data["details"] = collider.lore_details
+						
+			ui_node.show_scanner(true, scanner_data)
 	else:
 		var ui_node = get_tree().get_first_node_in_group("interface")
 		if ui_node and ui_node.has_method("show_scanner"):
-			ui_node.show_scanner(false, "")
+			ui_node.show_scanner(false)
 
 	is_ads = Input.is_action_pressed("ads")
 	weapon_handler.set_ads(is_ads)
@@ -297,14 +328,14 @@ func _change_state(new_state: State):
 
 func _state_idle(delta):
 	_apply_ground_friction(delta)
-	var input_dir = Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
+	var input_dir = Input.get_vector("move_left", "move_right", "move_forward", "move_backward")
 	
 	if not is_on_floor(): _change_state(State.IN_AIR)
 	elif Input.is_key_pressed(KEY_CTRL): _change_state(State.CROUCHING)
 	elif input_dir != Vector2.ZERO: _change_state(State.WALKING)
 
 func _state_walking(delta):
-	var input_dir = Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
+	var input_dir = Input.get_vector("move_left", "move_right", "move_forward", "move_backward")
 	_apply_ground_movement(input_dir, walk_speed, delta)
 	_handle_headbob(delta)
 	
@@ -317,7 +348,7 @@ func _state_walking(delta):
 		_fov_sprint_pulse_cur = fov_sprint_pulse
 
 func _state_sprinting(delta):
-	var input_dir = Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
+	var input_dir = Input.get_vector("move_left", "move_right", "move_forward", "move_backward")
 	_apply_ground_movement(input_dir, sprint_speed, delta)
 	_handle_headbob(delta)
 
@@ -335,7 +366,7 @@ func _state_sprinting(delta):
 		_change_state(State.SLIDING)
 
 func _state_crouching(delta):
-	var input_dir = Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
+	var input_dir = Input.get_vector("move_left", "move_right", "move_forward", "move_backward")
 	_apply_ground_movement(input_dir, crouch_speed, delta)
 	_handle_headbob(delta)
 
@@ -363,7 +394,7 @@ func _state_sliding(delta):
 		_change_state(State.CROUCHING if Input.is_key_pressed(KEY_CTRL) else State.IDLE)
 
 func _state_in_air(delta):
-	var input_dir = Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
+	var input_dir = Input.get_vector("move_left", "move_right", "move_forward", "move_backward")
 	var direction = (transform.basis * Vector3(input_dir.x, 0, input_dir.y)).normalized()
 	
 	var current_xz = Vector2(velocity.x, velocity.z)
@@ -430,6 +461,9 @@ func _apply_ground_friction(delta: float):
 	velocity.z = current_xz.y
 
 func _execute_jump_logic():
+	if is_on_floor():
+		can_double_jump = true
+
 	# If buffer has time and coyote has time, jump!
 	if jump_buffer_timer > 0 and coyote_timer > 0:
 		velocity.y = jump_velocity
@@ -440,6 +474,23 @@ func _execute_jump_logic():
 		jump_buffer_timer = 0.0 # Consume timers
 		coyote_timer = 0.0
 		_change_state(State.IN_AIR)
+	elif jump_buffer_timer > 0 and not is_on_floor() and can_double_jump and double_jump_cooldown <= 0:
+		# Double Jump Trigger!
+		velocity.y = double_jump_velocity
+		_jump_cam_punch_cur = jump_cam_punch * 1.5
+		trauma += jump_trauma_add * 0.8
+		trauma = clamp(trauma, 0.0, 1.0)
+		
+		jump_buffer_timer = 0.0
+		can_double_jump = false
+		double_jump_cooldown = double_jump_cooldown_time
+		_change_state(State.IN_AIR)
+		
+		# Play a sound if available, maybe reuse footstep with higher pitch
+		if footstep_snd:
+			footstep_snd.pitch_scale = randf_range(1.4, 1.6)
+			footstep_snd.volume_db = -2.0
+			footstep_snd.play()
 
 func _check_mantle_trigger():
 	if current_state == State.MANTLING or current_state == State.GRAPPLING: return
@@ -486,13 +537,23 @@ func _update_timers(delta):
 	if ui and ui.has_method("update_grapple_cooldown"):
 		ui.update_grapple_cooldown(grapple_cooldown, grapple_cooldown_time)
 
-	# Stamina Regen
-	if current_state != State.SPRINTING:
-		if regen_timer > 0: regen_timer -= delta
-		else: 
-			stamina += (STAMINA_REGEN * 2.0 if current_state == State.CROUCHING else STAMINA_REGEN) * delta
-			stamina = clamp(stamina, 0.0, 100.0)
-			stamina_changed.emit(stamina)
+	# Double Jump Cooldown
+	if double_jump_cooldown > 0: double_jump_cooldown -= delta
+	if ui and ui.has_method("update_double_jump_cooldown"):
+		ui.update_double_jump_cooldown(double_jump_cooldown, double_jump_cooldown_time)
+
+	# --- STAMINA LOGIC ---
+	if current_state == State.SPRINTING and velocity.length_squared() > 1.0:
+		stamina -= STAMINA_DRAIN * delta
+		if stamina <= 0:
+			stamina = 0
+			current_state = State.WALKING
+	elif current_state != State.SPRINTING and is_on_floor():
+		stamina += STAMINA_REGEN * delta
+		if stamina > 100: stamina = 100
+		
+	if ui and ui.has_method("update_stamina"):
+		ui.update_stamina(stamina)
 
 	# Grenades
 	if current_grenades < max_grenades:
@@ -659,8 +720,11 @@ func _update_interaction_target(delta: float):
 		if target and not target.has_method("interact"):
 			if target.get_parent() and target.get_parent().has_method("interact"): target = target.get_parent()
 			elif target.owner and target.owner.has_method("interact"): target = target.owner
-		if target and target.has_method("interact"): new_target = target
-
+		if target and target.has_method("interact"):
+			if "is_interactable" in target and target.get("is_interactable") == false:
+				pass # Ignore it
+			else:
+				new_target = target
 	if new_target != current_interactable:
 		current_interactable = new_target
 		interact_timer = 0.0 
@@ -736,12 +800,26 @@ func take_damage(amount: float) -> void:
 func _handle_regen(delta: float):
 	if health <= 0: return # Don't regen a corpse
 	
+	var is_healing_from_pool = false
+	if active_healing_pool > 0:
+		var heal_this_frame = 15.0 * delta # Heal 15 HP per second
+		if heal_this_frame > active_healing_pool: heal_this_frame = active_healing_pool
+		active_healing_pool -= heal_this_frame
+		
+		health += heal_this_frame
+		if health > max_health:
+			health = max_health
+			active_healing_pool = 0
+		health_changed.emit(health)
+		is_healing_from_pool = true
+		if health_snd and not health_snd.playing: health_snd.play()
+	
 	if combat_regen_timer > 0:
 		combat_regen_timer -= delta
 		
-		# Stop looping sounds if we took damage and the timer resets
+		# Stop looping sounds if we took damage and the timer resets, unless we are actively healing from a medkit
 		if armor_snd and armor_snd.playing: armor_snd.stop()
-		if health_snd and health_snd.playing: health_snd.stop()
+		if health_snd and health_snd.playing and not is_healing_from_pool: health_snd.stop()
 		
 	else:
 		var is_healing = false
@@ -771,16 +849,11 @@ func heal(amount: float) -> void:
 	if health <= 0 or health >= max_health: 
 		return 
 		
-	# Add the health and clamp it so it doesn't exceed the maximum
-	health += amount
-	health = min(health, max_health)
-	
-	# Update the UI
-	health_changed.emit(health)
-	
-	# Optional: Play the health sound effect as audio feedback!
-	if health_snd and not health_snd.playing:
-		health_snd.play()
+	# Add the amount to the active healing pool to heal over time
+	active_healing_pool += amount
+
+func has_key(key_id: String) -> bool:
+	return unlocked_keys.has(key_id)
 
 func die() -> void:
 	has_control = false

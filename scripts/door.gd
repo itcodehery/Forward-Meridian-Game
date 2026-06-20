@@ -64,13 +64,10 @@ func interact(player):
 		return
 		
 	# 2. Check Personal Keycard
-	var inventory = player.get_node("Inventory")
 	if is_locked:
-		if inventory and inventory.has_item_id(required_key_id):
+		if player.has_method("has_key") and player.has_key(required_key_id):
 			print("Key found! Unlocking...")
 			unlock_and_open()
-			if inventory.has_method("remove_item_id"):
-				inventory.remove_item_id(required_key_id)
 		else:
 			_show_ui_status("LOCKED - REQUIRES " + required_key_id.to_upper())
 			play_deny()

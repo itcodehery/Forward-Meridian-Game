@@ -6,6 +6,7 @@ extends Node3D
 @export_group("Logic")  
 @export var objective_id: String = "override_elevator"
 @export var switch_audio: AudioStream
+@export_multiline var lore_text: String = ""
 
 var is_activated: bool = false
 @onready var audio_player = $AudioStreamPlayer3D

@@ -36,11 +36,13 @@ func _do_pickup():
 	
 	# Case 3: Items (Medkits/Resources/Keys)
 	elif "item_data" in focused_pickup and focused_pickup.item_data != null:
-		var inventory = get_parent().get_node("Inventory")
 		var item_name = focused_pickup.item_data.item_name
+		var player = get_parent()
 		
-		if inventory:
-			if inventory.add_item(focused_pickup.item_data, focused_pickup.quantity):
+		# If it's a key
+		if "key" in item_name.to_lower():
+			if not player.unlocked_keys.has(focused_pickup.item_data.item_id):
+				player.unlocked_keys.append(focused_pickup.item_data.item_id)
 				ui.display_status("+ " + item_name)
 				
 				# --- OBJECTIVE LOGIC: SECURITY KEY ---
@@ -48,8 +50,21 @@ func _do_pickup():
 					if SaveManager.game_data.objectives.has("get_key"):
 						if not SaveManager.game_data.objectives["get_key"].done:
 							SaveManager.complete_objective("get_key")
-							
 				focused_pickup.queue_free()
+			else:
+				ui.display_status("ALREADY HAVE KEY")
+				
+		# If it's a health item
+		elif focused_pickup.item_data.type == Item.ItemType.HEALTH:
+			if player.health >= 100:
+				ui.display_status("HEALTH FULL")
+				# Don't pick it up!
+				pickup_cooldown = false
+				return
+			
+			player.heal(focused_pickup.item_data.value)
+			ui.display_status("+ " + item_name + " | +" + str(focused_pickup.item_data.value) + " HP")
+			focused_pickup.queue_free()
 	# Case 4: Custom Interactables (Objective items, buttons, radios, etc.)
 	elif focused_pickup.has_method("interact"):
 		focused_pickup.interact(get_parent()) # Pass the player in case the object needs it

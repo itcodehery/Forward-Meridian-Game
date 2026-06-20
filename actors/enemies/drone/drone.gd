@@ -603,16 +603,59 @@ func die() -> void:
 		else:
 			SaveManager.complete_objective("fight_security")
 
-	velocity = Vector3(randf_range(-4, 4), 6.0, randf_range(-4, 4))
-	await get_tree().create_timer(5.0).timeout
+	# --- Convert to RigidBody3D debris ---
+	var drone_model = $DroneModel
+	if not is_instance_valid(drone_model):
+		queue_free()
+		return
+
+	var rb = RigidBody3D.new()
+	var col = CollisionShape3D.new()
+	var shape = BoxShape3D.new()
+
+	# Fixed collision size matching the drone's visual body
+	shape.size = Vector3(1.2, 0.6, 1.2)
+
+	col.shape = shape
+	rb.add_child(col)
+
+	rb.collision_layer = 1
+	rb.collision_mask = 1
+
+	# Save global transform before reparenting
+	var saved_transform = drone_model.global_transform
+
+	# Reparent the model to the RigidBody
+	drone_model.get_parent().remove_child(drone_model)
+	rb.add_child(drone_model)
+	drone_model.transform = Transform3D.IDENTITY
+
+	# Add to the scene and position it
+	get_tree().current_scene.add_child(rb)
+	rb.global_transform = saved_transform
+
+	# Apply a gentle nudge — just enough to tumble and fall
+	var impulse = Vector3(randf_range(-1.5, 1.5), 1.5, randf_range(-1.5, 1.5))
+	rb.apply_impulse(impulse, Vector3(randf_range(-0.3, 0.3), 0.1, randf_range(-0.3, 0.3)))
+	rb.apply_torque_impulse(Vector3(randf_range(-2, 2), randf_range(-1, 1), randf_range(-2, 2)))
+
+	# Clean up debris after 10 seconds
+	get_tree().create_timer(10.0).timeout.connect(func():
+		if is_instance_valid(rb):
+			rb.queue_free()
+	)
+
+	# Delete the original CharacterBody3D
 	queue_free()
 
-func _process_dead(delta: float) -> void:
-	if not is_on_floor():
-		velocity += get_gravity() * delta
-		$DroneModel.rotate_x(8.0 * delta)
-		$DroneModel.rotate_z(5.0 * delta)
-	else:
-		velocity.x = move_toward(velocity.x, 0.0, 10.0 * delta)
-		velocity.z = move_toward(velocity.z, 0.0, 10.0 * delta)
-	move_and_slide()
+func _find_mesh_instances(node: Node) -> Array[MeshInstance3D]:
+	var result: Array[MeshInstance3D] = []
+	if node is MeshInstance3D:
+		result.append(node)
+	for child in node.get_children():
+		result.append_array(_find_mesh_instances(child))
+	return result
+
+func _process_dead(_delta: float) -> void:
+	# No longer needed — RigidBody3D handles physics now
+	pass

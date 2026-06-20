@@ -26,6 +26,9 @@ func _ready():
 	progress_bar.value = 0
 
 func start_tutorial(tutorial_key: String):
+	if not SettingsManager.tutorials_enabled:
+		return
+		
 	if not tutorial_data.has(tutorial_key):
 		push_error("Tutorial key not found: " + tutorial_key)
 		return

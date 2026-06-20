@@ -16,6 +16,7 @@ static func get_default_reserve(type: AmmoType) -> int:
 
 @export_category("Core Setup")
 @export var name: String = "Rifle"
+@export_multiline var lore_description: String = "" # <--- NEW: Lore description for scanner
 @export var damage: float = 20.0
 @export var fire_rate: float = 0.1
 @export var fire_mode: FireMode = FireMode.SEMI

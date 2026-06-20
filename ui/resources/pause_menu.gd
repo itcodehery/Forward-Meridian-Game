@@ -28,9 +28,11 @@ extends CanvasLayer
 @onready var ui_audio = $AudioStreamPlayer2D
 
 var in_logs_menu: bool = false
-var in_controls_menu: bool = false
+var in_settings_menu: bool = false
 var in_save_load_menu: bool = false
-@onready var controls_menu_state = Control.new()
+
+@onready var settings_menu_state = preload("res://ui/menus/settings_menu.tscn").instantiate()
+
 @onready var save_load_menu_state = Control.new()
 
 func _ready():
@@ -44,12 +46,10 @@ func _ready():
 	# Initialize UI
 	_setup_logs()
 	
-	# Setup Controls Menu
-	controls_menu_state.set_script(preload("res://ui/menus/controls_menu.gd"))
-	controls_menu_state.name = "ControlsMenuState"
-	controls_menu_state.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	$BackgroundImage.add_child(controls_menu_state)
-	controls_menu_state.hide()
+	# Setup Settings Menu
+	settings_menu_state.name = "SettingsMenuState"
+	$BackgroundImage.add_child(settings_menu_state)
+	settings_menu_state.hide()
 	
 	# Setup Save/Load Menu
 	save_load_menu_state.set_script(preload("res://ui/menus/save_load_menu.gd"))
@@ -74,20 +74,20 @@ func _ready():
 	menu_vbox.move_child(load_btn, 3) 
 	load_btn.pressed.connect(open_load_menu)
 	
-	# Add Controls Button dynamically
-	var controls_btn = log_button_scene.instantiate()
-	controls_btn.text_label = "CONTROLS"
-	menu_vbox.add_child(controls_btn)
-	menu_vbox.move_child(controls_btn, 4) 
-	controls_btn.pressed.connect(open_controls_menu)
+	# Add Settings Button dynamically
+	var settings_btn = log_button_scene.instantiate()
+	settings_btn.text_label = "SETTINGS"
+	menu_vbox.add_child(settings_btn)
+	menu_vbox.move_child(settings_btn, 4) 
+	settings_btn.pressed.connect(open_settings_menu)
 	
 	# Ensure we start on the main menu
 	_reset_menu_state()
 
 func _unhandled_input(event):
 	if event.is_action_pressed("ui_cancel"):
-		# If we are in the logs or controls, Escape should take us back to the main menu first
-		if in_logs_menu or in_controls_menu or in_save_load_menu:
+		# If we are in the logs or settings, Escape should take us back to the main menu first
+		if in_logs_menu or in_settings_menu or in_save_load_menu:
 			_reset_menu_state()
 		else:
 			toggle_pause()
@@ -126,11 +126,11 @@ func _toggle_hud(show_hud: bool):
 
 func _reset_menu_state():
 	in_logs_menu = false
-	in_controls_menu = false
+	in_settings_menu = false
 	in_save_load_menu = false
 	logs_menu_state.hide()
-	if is_instance_valid(controls_menu_state):
-		controls_menu_state.hide()
+	if is_instance_valid(settings_menu_state):
+		settings_menu_state.hide()
 	if is_instance_valid(save_load_menu_state):
 		save_load_menu_state.hide()
 	main_menu_state.show()
@@ -138,22 +138,22 @@ func _reset_menu_state():
 func open_logs_menu():
 	in_logs_menu = true
 	main_menu_state.hide()
-	if is_instance_valid(controls_menu_state): controls_menu_state.hide()
+	if is_instance_valid(settings_menu_state): settings_menu_state.hide()
 	if is_instance_valid(save_load_menu_state): save_load_menu_state.hide()
 	logs_menu_state.show()
 
-func open_controls_menu():
-	in_controls_menu = true
+func open_settings_menu():
+	in_settings_menu = true
 	main_menu_state.hide()
 	logs_menu_state.hide()
 	if is_instance_valid(save_load_menu_state): save_load_menu_state.hide()
-	controls_menu_state.show()
+	settings_menu_state.show()
 	
 func open_save_menu():
 	in_save_load_menu = true
 	main_menu_state.hide()
 	logs_menu_state.hide()
-	if is_instance_valid(controls_menu_state): controls_menu_state.hide()
+	if is_instance_valid(settings_menu_state): settings_menu_state.hide()
 	save_load_menu_state.set_mode("SAVE")
 	save_load_menu_state.show()
 
@@ -161,7 +161,7 @@ func open_load_menu():
 	in_save_load_menu = true
 	main_menu_state.hide()
 	logs_menu_state.hide()
-	if is_instance_valid(controls_menu_state): controls_menu_state.hide()
+	if is_instance_valid(settings_menu_state): settings_menu_state.hide()
 	save_load_menu_state.set_mode("LOAD")
 	save_load_menu_state.show()
 

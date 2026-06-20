@@ -23,6 +23,7 @@ extends CanvasLayer
 
 # --- Equipment UI ---
 @onready var grapple_icon = %GrappleBar
+@onready var double_jump_icon = %DoubleJumpBar
 @onready var grenade_bar = %GrenadeBar
 @onready var grenade_count_label = %GrenadeCount
 # --- Objective UI ---
@@ -31,6 +32,12 @@ extends CanvasLayer
 # --- Status Indicator ---
 @onready var status_box = %StatusBox
 @onready var status_text = %StatusText
+
+# --- Vignette & Waypoints ---
+@onready var health_vignette = %HealthVignette
+@onready var waypoint_icon = %WaypointIcon
+@onready var waypoint_distance_label = %WaypointDistanceLabel
+var vignette_tween: Tween
 
 # --- Debug UI ---
 #@onready var fps_label = %FPSLabel
@@ -60,55 +67,63 @@ func _ready():
 	
 	# Start invisible
 	status_text.modulate.a = 0.0
+	if health_vignette: health_vignette.material.set_shader_parameter("intensity", 0.0)
 	add_to_group("interface")
 	
 	_setup_scanner_ui()
 	
 	call_deferred("initialize_ui")
 
-var scanner_panel: Panel
-var scanner_label: Label
+var scanner_panel: Control
 
 func _setup_scanner_ui():
-	scanner_panel = Panel.new()
-	scanner_panel.set_anchors_and_offsets_preset(Control.PRESET_RIGHT_WIDE)
-	scanner_panel.custom_minimum_size = Vector2(450, 0)
-	var style = StyleBoxFlat.new()
-	style.bg_color = Color(0.0, 0.1, 0.2, 0.75)
-	style.border_width_left = 6
-	style.border_color = Color(0.0, 0.8, 1.0, 0.9)
-	scanner_panel.add_theme_stylebox_override("panel", style)
-	
-	var margin = MarginContainer.new()
-	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	margin.add_theme_constant_override("margin_left", 30)
-	margin.add_theme_constant_override("margin_right", 30)
-	margin.add_theme_constant_override("margin_top", 40)
-	margin.add_theme_constant_override("margin_bottom", 40)
-	scanner_panel.add_child(margin)
-	
-	scanner_label = Label.new()
-	scanner_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	scanner_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	scanner_label.add_theme_font_size_override("font_size", 22)
-	margin.add_child(scanner_label)
-	
-	%HUD.add_child(scanner_panel)
-	scanner_panel.hide()
+	var scanner_scene = load("res://ui/hud/scanner_ui.tscn")
+	if scanner_scene:
+		scanner_panel = scanner_scene.instantiate()
+		scanner_panel.modulate.a = 0.0
+		%HUD.add_child(scanner_panel)
+		scanner_panel.hide()
 
-func show_scanner(is_scanning: bool, lore_text: String):
+var scanner_tween: Tween
+
+func set_scanner_hud_visible(is_visible: bool):
+	var ammo_counter = get_node_or_null("%AmmoCounter")
+	if ammo_counter: ammo_counter.visible = is_visible
+	
+	var hud = get_node_or_null("%HUD")
+	if hud:
+		var equipment_row = hud.get_node_or_null("EquipmentRow")
+		if equipment_row: equipment_row.visible = is_visible
+		
+		var inventory = hud.get_node_or_null("Inventory")
+		if inventory: 
+			if is_visible:
+				inventory.visible = Input.is_action_pressed("toggle_inventory")
+			else:
+				inventory.visible = false
+
+func show_scanner(is_scanning: bool, scanner_data: Dictionary = {}):
 	if not scanner_panel: return
 	
+	if scanner_tween and scanner_tween.is_valid():
+		scanner_tween.kill()
+	
 	if is_scanning:
+		if not scanner_panel.visible:
+			scanner_panel.modulate.a = 0.0
 		scanner_panel.show()
-		if lore_text == "":
-			scanner_label.text = "SCANNING...\n\nNO DATA DETECTED"
-			scanner_panel.get_theme_stylebox("panel").border_color = Color(0.5, 0.5, 0.5, 0.5)
-		else:
-			scanner_label.text = "DECRYPTING TARGET...\n\n" + lore_text
-			scanner_panel.get_theme_stylebox("panel").border_color = Color(0.0, 0.8, 1.0, 0.9)
+		set_scanner_hud_visible(false)
+		
+		if scanner_panel.has_method("set_lore"):
+			scanner_panel.set_lore(scanner_data)
+			
+		scanner_tween = create_tween()
+		scanner_tween.tween_property(scanner_panel, "modulate:a", 1.0, 0.05).set_trans(Tween.TRANS_SINE)
 	else:
-		scanner_panel.hide()
+		set_scanner_hud_visible(true)
+		scanner_tween = create_tween()
+		scanner_tween.tween_property(scanner_panel, "modulate:a", 0.0, 0.05).set_trans(Tween.TRANS_SINE)
+		scanner_tween.tween_callback(scanner_panel.hide)
 
 #func _notification(what):
 	##if what == NOTIFICATION_WM_SIZE_CHANGED:
@@ -154,6 +169,7 @@ func initialize_ui():
 
 func _process(delta):
 	stamina_bar.value = lerp(stamina_bar.value, target_stamina, 15.0 * delta)
+	_update_waypoints()
 	# Engine.get_frames_per_second() gives you the average of the last few frames
 	#var fps = Engine.get_frames_per_second()
 	#fps_label.text = "FPS: " + str(fps)
@@ -191,7 +207,6 @@ func _on_ammo_changed(mag, reserve, is_melee, uses_battery):
 		ammo_label.text = str(mag).pad_zeros(3)
 		reserve_label.text = str(reserve).pad_zeros(3)
 
-# FIXED: Removed w_type to match the 3 arguments emitted by weapon_handler.gd
 func _on_weapon_changed(w_name, is_melee, icon):
 	weapon_name_label.text = str(w_name)
 	if icon:
@@ -238,6 +253,66 @@ func set_interaction_prompt(text: String, show_prompt: bool, texture: Texture2D 
 func _on_health_changed(new_value):
 	var tween = create_tween()
 	tween.tween_property(health_bar, "value", new_value, 0.2).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+	if health_vignette and health_bar.max_value > 0:
+		var health_percent = new_value / health_bar.max_value
+		var target_a = 0.0
+		
+		# Start fading in at 50% health. At 25% health it will be 0.5 alpha, at 0% health it will be 1.0 alpha.
+		if health_percent <= 0.5:
+			target_a = clamp(1.0 - (health_percent / 0.5), 0.0, 1.0)
+		
+		if vignette_tween and vignette_tween.is_valid():
+			vignette_tween.kill()
+		vignette_tween = create_tween()
+		
+		# Tween the shader parameter directly instead of modulate, since the custom shader overrides modulate!
+		vignette_tween.tween_property(health_vignette.material, "shader_parameter/intensity", target_a, 0.5)
+
+func _update_waypoints():
+	if not waypoint_icon: return
+	
+	# Find active waypoints in the scene
+	var waypoints = get_tree().get_nodes_in_group("objective_waypoints")
+	
+	var target_wp = null
+	for wp in waypoints:
+		# If the SaveManager says this objective isn't done yet, point to it
+		if SaveManager.game_data.objectives.has(wp.objective_id) and not SaveManager.game_data.objectives[wp.objective_id].done:
+			target_wp = wp
+			break
+			
+	if not target_wp:
+		waypoint_icon.visible = false
+		return
+		
+	var cam = get_viewport().get_camera_3d()
+	if not cam: return
+	
+	waypoint_icon.visible = true
+	var screen_pos = cam.unproject_position(target_wp.global_position)
+	var is_behind = cam.is_position_behind(target_wp.global_position)
+	var distance = cam.global_position.distance_to(target_wp.global_position)
+	
+	if distance < 5.0:
+		waypoint_icon.visible = false
+		return
+	
+	if waypoint_distance_label:
+		waypoint_distance_label.text = str(int(distance)) + "m"
+	
+	var viewport_size = get_viewport().size
+	var margin = 60.0
+	
+	if is_behind:
+		# If behind, push it to the bottom edge
+		screen_pos.y = viewport_size.y - margin
+		screen_pos.x = viewport_size.x - screen_pos.x
+	
+	screen_pos.x = clamp(screen_pos.x, margin, viewport_size.x - margin)
+	screen_pos.y = clamp(screen_pos.y, margin, viewport_size.y - margin)
+	
+	waypoint_icon.position = screen_pos - waypoint_icon.size / 2.0
 
 func _on_armor_changed(new_value):
 	if new_value < armor_bar.value:
@@ -307,6 +382,17 @@ func update_grapple_cooldown(current_cooldown: float, max_cooldown: float):
 	else:
 		grapple_icon.value = max_cooldown - current_cooldown
 		grapple_icon.tint_progress = Color(1.0, 1.0, 1.0, 0.6)
+
+func update_double_jump_cooldown(current_cooldown: float, max_cooldown: float):
+	if not double_jump_icon: return
+	double_jump_icon.max_value = max_cooldown
+	
+	if current_cooldown <= 0:
+		double_jump_icon.value = max_cooldown
+		double_jump_icon.tint_progress = Color(1.0, 1.0, 1.0, 1.0) 
+	else:
+		double_jump_icon.value = max_cooldown - current_cooldown
+		double_jump_icon.tint_progress = Color(1.0, 1.0, 1.0, 0.6)
 
 func update_grenade_ui(current_charges: int, max_charges: int, timer: float, recharge_time: float):
 	grenade_count_label.text = str(current_charges)

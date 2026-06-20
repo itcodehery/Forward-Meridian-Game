@@ -25,11 +25,14 @@ extends CanvasLayer
 @onready var continue_btn = $MenuElements/MainButtons/ContinueButton
 @onready var new_game_btn = $MenuElements/MainButtons/NewGameButton
 @onready var load_game_btn = $MenuElements/MainButtons/LoadGameButton
+@onready var settings_btn = $MenuElements/MainButtons/SettingsButton
 @onready var quit_btn = $MenuElements/MainButtons/QuitButton
 
 @onready var load_menu_panel = $MenuElements/LoadMenuPanel
 @onready var save_list_container = $MenuElements/LoadMenuPanel/ScrollContainer/SaveListContainer
 @onready var back_btn = $MenuElements/LoadMenuPanel/BackButton
+
+@onready var settings_menu_state = preload("res://ui/menus/settings_menu.tscn").instantiate()
 
 # --- NEW: SPLASH REFERENCES ---
 @onready var splash_container = $SplashContainer
@@ -41,6 +44,9 @@ var current_state = MenuState.SPLASH
 
 func _ready():
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	
+	add_child(settings_menu_state)
+	settings_menu_state.hide()
 	
 	# Initial UI Setup: Hide everything except Splash
 	title_elements.modulate.a = 0.0
@@ -64,6 +70,7 @@ func _ready():
 	continue_btn.pressed.connect(_on_continue_pressed)
 
 	load_game_btn.pressed.connect(_on_load_game_pressed)
+	settings_btn.pressed.connect(_on_settings_pressed)
 	quit_btn.pressed.connect(_on_quit_pressed)
 	back_btn.pressed.connect(_on_back_pressed)
 	
@@ -219,9 +226,17 @@ func _on_load_game_pressed():
 	load_menu_panel.show()
 	_populate_save_list()
 
-func _on_back_pressed():
+func _on_settings_pressed():
+	main_buttons.hide()
+	settings_menu_state.show()
+
+func _reset_menu_state():
+	settings_menu_state.hide()
 	load_menu_panel.hide()
 	main_buttons.show()
+
+func _on_back_pressed():
+	_reset_menu_state()
 
 func _on_quit_pressed():
 	get_tree().quit()
@@ -250,6 +265,18 @@ func _populate_save_list():
 		var prefix = "[LATEST] " if i == 0 else ""
 		btn.text = prefix + save_info.level.capitalize() + "  -  " + save_info.date
 		btn.custom_minimum_size = Vector2(300, 50) 
+		
+		# Apply main menu button styling
+		btn.add_theme_color_override("font_color", Color.BLACK)
+		btn.add_theme_color_override("font_hover_color", Color.BLACK)
+		btn.add_theme_color_override("font_pressed_color", Color.BLACK)
+		btn.add_theme_font_override("font", preload("res://assets/fonts/Industry/Industry-Book.ttf"))
+		btn.add_theme_font_size_override("font_size", 20)
+		btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		btn.add_theme_stylebox_override("normal", back_btn.get_theme_stylebox("normal"))
+		btn.add_theme_stylebox_override("hover", back_btn.get_theme_stylebox("hover"))
+		btn.add_theme_stylebox_override("pressed", back_btn.get_theme_stylebox("pressed"))
+		
 		btn.pressed.connect(_on_specific_save_selected.bind(save_info.path))
 		
 		save_list_container.add_child(btn)
