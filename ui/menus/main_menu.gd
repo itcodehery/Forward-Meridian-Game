@@ -235,6 +235,11 @@ func _reset_menu_state():
 	load_menu_panel.hide()
 	main_buttons.show()
 
+func _unhandled_input(event):
+	if event.is_action_pressed("ui_cancel"):
+		if not main_buttons.visible:
+			_reset_menu_state()
+
 func _on_back_pressed():
 	_reset_menu_state()
 

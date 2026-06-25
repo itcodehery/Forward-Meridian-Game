@@ -86,6 +86,10 @@ func _ready():
 
 func _unhandled_input(event):
 	if event.is_action_pressed("ui_cancel"):
+		# Ignore pause input if we are on the main menu
+		if get_tree().current_scene and get_tree().current_scene.scene_file_path.ends_with("main_menu.tscn"):
+			return
+			
 		# If we are in the logs or settings, Escape should take us back to the main menu first
 		if in_logs_menu or in_settings_menu or in_save_load_menu:
 			_reset_menu_state()

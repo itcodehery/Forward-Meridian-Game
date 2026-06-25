@@ -32,15 +32,19 @@ extends CanvasLayer
 # --- Status Indicator ---
 @onready var status_box = %StatusBox
 @onready var status_text = %StatusText
+@onready var hazard_container = %HazardContainer
+var hazard_tween;
 
 # --- Vignette & Waypoints ---
 @onready var health_vignette = %HealthVignette
 @onready var waypoint_icon = %WaypointIcon
 @onready var waypoint_distance_label = %WaypointDistanceLabel
 var vignette_tween: Tween
+var _waypoint_update_timer: float = 0.0
+var _cached_target_wp: Node3D = null
 
 # --- Debug UI ---
-#@onready var fps_label = %FPSLabel
+@onready var fps_label = %FPSLabel
 
 var fade_tween: Tween
 var show_status_duration : float = 4.0
@@ -68,11 +72,32 @@ func _ready():
 	# Start invisible
 	status_text.modulate.a = 0.0
 	if health_vignette: health_vignette.material.set_shader_parameter("intensity", 0.0)
+	if hazard_container: hazard_container.hide()
 	add_to_group("interface")
 	
 	_setup_scanner_ui()
 	
 	call_deferred("initialize_ui")
+
+func show_hazard_warning(text: String):
+	if not hazard_container: return
+	if hazard_container.visible: return
+	%HazardLabel.text = text
+	hazard_container.show()
+	
+	if hazard_tween and hazard_tween.is_valid():
+		hazard_tween.kill()
+		
+	hazard_tween = create_tween().set_loops()
+	hazard_tween.tween_property(hazard_container, "modulate:a", 0.2, 0.5)
+	hazard_tween.tween_property(hazard_container, "modulate:a", 1.0, 0.5)
+
+func hide_hazard_warning():
+	if not hazard_container: return
+	if hazard_tween and hazard_tween.is_valid():
+		hazard_tween.kill()
+	hazard_container.hide()
+	hazard_container.modulate.a = 1.0
 
 var scanner_panel: Control
 
@@ -169,18 +194,18 @@ func initialize_ui():
 
 func _process(delta):
 	stamina_bar.value = lerp(stamina_bar.value, target_stamina, 15.0 * delta)
-	_update_waypoints()
-	# Engine.get_frames_per_second() gives you the average of the last few frames
-	#var fps = Engine.get_frames_per_second()
-	#fps_label.text = "FPS: " + str(fps)
+	_update_waypoints(delta)
+	Engine.get_frames_per_second() # gives you the average of the last few frames
+	var fps = Engine.get_frames_per_second()
+	fps_label.text = "FPS: " + str(fps)
 	
 	# Change color based on performance
-	#if fps >= 60:
-		#fps_label.modulate = Color.GREEN
-	#elif fps >= 30:
-		#fps_label.modulate = Color.YELLOW
-	#else:
-		#fps_label.modulate = Color.RED
+	if fps >= 60:
+		fps_label.modulate = Color.GREEN
+	elif fps >= 30:
+		fps_label.modulate = Color.YELLOW
+	else:
+		fps_label.modulate = Color.RED
 
 func _on_stamina_changed(new_value):
 	target_stamina = new_value
@@ -269,22 +294,27 @@ func _on_health_changed(new_value):
 		# Tween the shader parameter directly instead of modulate, since the custom shader overrides modulate!
 		vignette_tween.tween_property(health_vignette.material, "shader_parameter/intensity", target_a, 0.5)
 
-func _update_waypoints():
+func _update_waypoints(delta: float):
 	if not waypoint_icon: return
 	
-	# Find active waypoints in the scene
-	var waypoints = get_tree().get_nodes_in_group("objective_waypoints")
-	
-	var target_wp = null
-	for wp in waypoints:
-		# If the SaveManager says this objective isn't done yet, point to it
-		if SaveManager.game_data.objectives.has(wp.objective_id) and not SaveManager.game_data.objectives[wp.objective_id].done:
-			target_wp = wp
-			break
+	_waypoint_update_timer -= delta
+	if _waypoint_update_timer <= 0.0:
+		_waypoint_update_timer = 0.5 # update target every 0.5 seconds
+		_cached_target_wp = null
+		
+		# Find active waypoints in the scene
+		var waypoints = get_tree().get_nodes_in_group("objective_waypoints")
+		for wp in waypoints:
+			# If the SaveManager says this objective isn't done yet, point to it
+			if SaveManager.game_data.objectives.has(wp.objective_id) and not SaveManager.game_data.objectives[wp.objective_id].done:
+				_cached_target_wp = wp
+				break
 			
-	if not target_wp:
+	if not is_instance_valid(_cached_target_wp):
 		waypoint_icon.visible = false
 		return
+		
+	var target_wp = _cached_target_wp
 		
 	var cam = get_viewport().get_camera_3d()
 	if not cam: return

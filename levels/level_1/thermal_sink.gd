@@ -22,6 +22,10 @@ func _on_body_entered(body):
 	if body.is_in_group("players"):
 		players_in_zone.append(body)
 		
+		# Show hazard warning
+		if body.get("ui") and body.ui.has_method("show_hazard_warning"):
+			body.ui.show_hazard_warning("TOXIC WASTE")
+		
 		# Start the "burn" timer
 		if damage_timer.is_stopped():
 			damage_timer.start()
@@ -33,6 +37,10 @@ func _on_body_entered(body):
 func _on_body_exited(body):
 	if body in players_in_zone:
 		players_in_zone.erase(body)
+		
+		# Hide hazard warning
+		if body.get("ui") and body.ui.has_method("hide_hazard_warning"):
+			body.ui.hide_hazard_warning()
 		
 		# If the last player escaped, stop the timer and fade the audio!
 		if players_in_zone.is_empty():
