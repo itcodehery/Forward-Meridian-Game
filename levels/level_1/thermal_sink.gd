@@ -12,6 +12,9 @@ var players_in_zone = []
 var audio_tween: Tween # Keeps track of the fade animation
 
 func _ready():
+	audio_player.attenuation_model = AudioStreamPlayer3D.ATTENUATION_DISABLED
+	audio_player.volume_db = 15.0
+	
 	damage_timer.wait_time = tick_rate
 	damage_timer.timeout.connect(_on_timer_timeout)
 	
@@ -24,7 +27,7 @@ func _on_body_entered(body):
 		
 		# Show hazard warning
 		if body.get("ui") and body.ui.has_method("show_hazard_warning"):
-			body.ui.show_hazard_warning("TOXIC WASTE")
+			body.ui.show_hazard_warning("EXPOSURE TO TOXIC ENVIRONMENT!")
 		
 		# Start the "burn" timer
 		if damage_timer.is_stopped():
@@ -61,7 +64,7 @@ func _start_sizzle_audio():
 		audio_tween.kill()
 		
 	audio_player.stream = damage_audio
-	audio_player.volume_db = 0.0 # Reset volume back to normal!
+	audio_player.volume_db = 15.0 # Make it loud!
 	
 	if not audio_player.playing:
 		audio_player.pitch_scale = randf_range(0.9, 1.1)

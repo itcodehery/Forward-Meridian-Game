@@ -75,6 +75,7 @@ var current_state: State = State.IDLE
 @export_category("Double Jump")
 @export var double_jump_velocity: float = 5.5
 @export var double_jump_cooldown_time: float = 6.0
+@export var double_jump_sound: AudioStream
 
 # ─────────────────────────────────────────────
 # STATE VARIABLES & REFERENCES
@@ -176,9 +177,16 @@ func _ready():
 	pickup_area.body_exited.connect(_on_interactable_exited)
 	
 	scanner_cast = RayCast3D.new()
-	scanner_cast.target_position = Vector3(0, 0, -10)
+	scanner_cast.target_position = Vector3(0, 0, -50)
 	scanner_cast.collide_with_areas = true
 	scanner_cast.collide_with_bodies = true
+	
+	if double_jump_sound:
+		var dj_player = AudioStreamPlayer3D.new()
+		dj_player.name = "DoubleJumpPlayer"
+		dj_player.stream = double_jump_sound
+		dj_player.volume_db = 2.0
+		add_child(dj_player)
 	main_camera.add_child(scanner_cast)
 
 	if grapple_scene:
@@ -220,7 +228,6 @@ func _unhandled_input(event):
 	# Weapons
 	if event.is_action_pressed("switch_weapon"): weapon_handler.toggle_weapon()
 	if event.is_action_pressed("melee_strike"):  weapon_handler.quick_melee()
-	if event.is_action_pressed("drop_weapon"): weapon_handler.drop_current_weapon()
 	if event.is_action_pressed("reload"):      weapon_handler.begin_reload()
 
 # ─────────────────────────────────────────────
@@ -487,7 +494,10 @@ func _execute_jump_logic():
 		_change_state(State.IN_AIR)
 		
 		# Play a sound if available, maybe reuse footstep with higher pitch
-		if footstep_snd:
+		var dj_player = get_node_or_null("DoubleJumpPlayer")
+		if dj_player and double_jump_sound:
+			dj_player.play()
+		elif footstep_snd:
 			footstep_snd.pitch_scale = randf_range(1.4, 1.6)
 			footstep_snd.volume_db = -2.0
 			footstep_snd.play()
@@ -862,7 +872,8 @@ func die() -> void:
 	
 	# Transition to your death screen
 	if DEATH_SCREEN:
-		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-		get_tree().change_scene_to_packed(DEATH_SCREEN)
+		var death_ui = DEATH_SCREEN.instantiate()
+		get_tree().current_scene.add_child(death_ui)
+		death_ui.trigger_death()
 	else:
 		print("Player died, but no DEATH_SCREEN packed scene is set!")

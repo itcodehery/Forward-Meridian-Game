@@ -56,6 +56,7 @@ var direction_flip_timer: float = 0.0
 
 func _ready() -> void:
 	add_to_group("swarmers")
+	add_to_group("enemies")
 	player = get_tree().get_first_node_in_group("players")
 	orbit_angle = randf() * TAU
 	orbit_direction = 1.0 if randf() > 0.5 else -1.0

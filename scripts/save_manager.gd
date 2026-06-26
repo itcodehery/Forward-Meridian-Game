@@ -140,6 +140,14 @@ func new_game() -> void:
 	
 	checkpoint_timer.start()
 
+func restart_current_level() -> void:
+	game_data.objectives.clear()
+	game_data.player_stats = {
+		"health": 100.0, "armor": 0.0,
+		"pos_x": 0.0, "pos_y": 0.0, "pos_z": 0.0
+	}
+	save_game(false)
+
 func create_checkpoint() -> void:
 	var player = get_tree().get_first_node_in_group("players")
 	if player:

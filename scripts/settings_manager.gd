@@ -6,9 +6,9 @@ signal graphics_updated
 
 var configurable_actions = [
 	"move_forward", "move_backward", "move_left", "move_right", "ui_crouch",
-	"switch_weapon", "melee_strike", "drop_weapon",
+	"switch_weapon", "melee_strike",
 	"fire", "reload", "interact", "ads",
-	"grapple", "grenade", "toggle_inventory", "scan"
+	"grapple", "grenade", "scan"
 ]
 
 # --- Audio Settings ---
@@ -221,7 +221,7 @@ func apply_preset(preset: int):
 			anti_aliasing = 1 # FXAA
 			shadow_quality = 0 # Low
 			sdfgi_enabled = false
-			bloom_enabled = false
+			bloom_enabled = true
 
 func apply_and_save():
 	apply_video_settings()

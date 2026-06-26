@@ -41,6 +41,7 @@ extends CanvasLayer
 
 enum MenuState { SPLASH, TITLE, TRANSITIONING, MENU }
 var current_state = MenuState.SPLASH 
+var title_tween: Tween
 
 func _ready():
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
@@ -139,9 +140,11 @@ func _enter_title_screen():
 		background_video.play()
 		
 	# Fade in the title logo/text
-	var tween = create_tween().set_parallel(true)
-	tween.tween_property(title_elements, "modulate:a", 1.0, 1.0)
-	tween.tween_property(logo_anchor, "modulate:a", 1.0, 1.0) # <--- ADD THIS LINE
+	if title_tween and title_tween.is_valid():
+		title_tween.kill()
+	title_tween = create_tween().set_parallel(true)
+	title_tween.tween_property(title_elements, "modulate:a", 1.0, 1.0)
+	title_tween.tween_property(logo_anchor, "modulate:a", 1.0, 1.0) # <--- ADD THIS LINE
 
 
 # ---------------------------------------------------------
@@ -179,6 +182,9 @@ func _input(event):
 
 func trigger_transition():
 	current_state = MenuState.TRANSITIONING
+	
+	if title_tween and title_tween.is_valid():
+		title_tween.kill()
 	
 	var screen_size = get_viewport().get_visible_rect().size
 	var tween = create_tween().set_parallel(true)

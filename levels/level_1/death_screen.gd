@@ -38,7 +38,11 @@ func _on_restart_button_pressed():
 	get_tree().paused = false 
 	# 2. Kill this UI so it doesn't persist into the next life
 	queue_free() 
-	# 3. Now reload the scene
+	
+	# 3. Wipe the checkpoint and objectives so we start from the very beginning of the level
+	SaveManager.restart_current_level()
+		
+	# 4. Now reload the scene
 	get_tree().reload_current_scene()
 
 func _on_menu_button_pressed():

@@ -6,6 +6,9 @@ extends Node3D
 @export var image_hold_time: float = 3.0
 @export var crossfade_time: float = 1.0
 
+@export_group("Audio Settings")
+@export var intro_audio: AudioStream
+
 @onready var anim = $AnimationPlayer
 @onready var cine_cam = $CineCam
 @onready var audio_player = $AudioStreamPlayer3D
@@ -21,6 +24,9 @@ var is_skipping = false
 func _ready():
 	await get_tree().process_frame
 	player = get_tree().get_first_node_in_group("players")
+	
+	if intro_audio:
+		audio_player.stream = intro_audio
 	
 	# Ensure the slideshow starts visible but the image itself is invisible
 	if slideshow_layer:

@@ -1,68 +1,53 @@
 shader_type spatial;
-render_mode blend_mix, depth_draw_opaque, cull_back, unshaded;
+render_mode specular_schlick_ggx, blend_mix;
 
-uniform vec4 water_color : source_color = vec4(0.0, 0.95, 0.65, 0.85);
-uniform vec4 foam_color : source_color = vec4(0.95, 1.0, 0.95, 1.0);
+// --- Colors ---
+uniform vec4 base_water_color : source_color = vec4(0.25, 0.82, 0.65, 0.9); // Mint green
+uniform vec4 patch_color : source_color = vec4(0.85, 0.95, 0.90, 1.0);      // Whitish foam/patches
 
-uniform float wave_speed = 0.5;
-uniform float wave_frequency = 2.0;
-uniform float wave_amplitude = 0.1;
+// --- Cartoony Patches ---
+uniform sampler2D patch_noise;
+uniform float patch_scale = 5.0;
+uniform float patch_threshold = 0.55;
+uniform vec2 patch_pan_speed = vec2(0.015, 0.01);
 
-uniform float foam_threshold = 0.55;
-uniform float foam_noise_scale = 15.0;
-
-// Simple random and noise
-float hash(vec2 p) {
-    p = fract(p * vec2(123.34, 456.21));
-    p += dot(p, p + 45.32);
-    return fract(p.x * p.y);
-}
-
-float noise(vec2 p) {
-    vec2 i = floor(p);
-    vec2 f = fract(p);
-    f = f * f * (3.0 - 2.0 * f);
-    float a = hash(i);
-    float b = hash(i + vec2(1.0, 0.0));
-    float c = hash(i + vec2(0.0, 1.0));
-    float d = hash(i + vec2(1.0, 1.0));
-    return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
-}
-
-float fbm(vec2 p) {
-    float value = 0.0;
-    float amplitude = 0.5;
-    for(int i = 0; i < 3; i++) {
-        value += amplitude * noise(p);
-        p *= 2.0;
-        amplitude *= 0.5;
-    }
-    return value;
-}
-
-void vertex() {
-    float t = TIME * wave_speed;
-    float wave = sin(VERTEX.x * wave_frequency + t) * wave_amplitude;
-    wave += cos(VERTEX.z * wave_frequency * 0.8 + t * 1.3) * wave_amplitude * 0.8;
-    VERTEX.y += wave;
-}
+// --- Realistic Lighting & Ripples ---
+uniform sampler2D wave_normal_1 : hint_normal;
+uniform sampler2D wave_normal_2 : hint_normal;
+uniform vec2 wave_dir_1 = vec2(0.04, 0.02);
+uniform vec2 wave_dir_2 = vec2(-0.03, 0.05);
+uniform float wave_strength = 0.7;
+uniform float water_roughness = 0.05; // Extremely low roughness for sharp, realistic reflections
 
 void fragment() {
-    vec2 uv = UV * foam_noise_scale;
-    float t = TIME * wave_speed * 0.5;
+    // 1. GENERATE THE CARTTOONY BASE
+    // Pan the UV coordinates over time for the patches to drift
+    vec2 patch_uv = UV * patch_scale + (TIME * patch_pan_speed);
     
-    // Distort UVs slightly with time
-    vec2 distorted_uv = uv + vec2(t, t * 0.8);
-    
-    // Generate noise value
-    float n = fbm(distorted_uv);
-    
-    // Create hard edge for foam using step
-    float foam = step(foam_threshold, n);
-    
-    // Mix the base water color and foam color based on the mask
-    vec4 final_color = mix(water_color, foam_color, foam);
-    
-    ALBEDO = final_color.rgb;
-    ALPHA = final_color.a;
+    // Sample the noise texture
+    float noise_val = texture(patch_noise, patch_uv).r;
+
+    // The magic trick for the "cartoony" look: 
+    // step() forces the noise to be either completely 0.0 or 1.0, removing all gradients.
+    float is_patch = step(patch_threshold, noise_val);
+
+    // Apply the colors based on that sharp noise mask
+    ALBEDO = mix(base_water_color.rgb, patch_color.rgb, is_patch);
+    ALPHA = mix(base_water_color.a, patch_color.a, is_patch);
+
+    // 2. LAYER THE REALISTIC LIGHTING
+    // Pan two normal maps in different directions at different speeds
+    vec2 wave_uv_1 = UV + (TIME * wave_dir_1);
+    vec2 wave_uv_2 = UV + (TIME * wave_dir_2);
+
+    vec3 normal_1 = texture(wave_normal_1, wave_uv_1).rgb;
+    vec3 normal_2 = texture(wave_normal_2, wave_uv_2).rgb;
+
+    // Blend the normal maps to create complex, non-repeating realistic water ripples
+    NORMAL_MAP = mix(normal_1, normal_2, 0.5);
+    NORMAL_MAP_DEPTH = wave_strength;
+
+    // Apply PBR properties for that realistic AAA shine
+    ROUGHNESS = water_roughness;
+    METALLIC = 0.0;
 }

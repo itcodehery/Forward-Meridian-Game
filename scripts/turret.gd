@@ -5,6 +5,12 @@ extends StaticBody3D
 #  States: idle → tracking → windup → firing → lost → cooldown
 # =============================================================================
 
+@export_group("Scanner Lore")
+@export var lore_title: String = "Sentry Turret"
+@export_multiline var lore_text: String = "Automated defense system."
+@export var lore_icon: Texture2D
+@export var lore_details: String = "ARMOR: Heavy | THREAT: High"
+
 # ---------------------------------------------------------------------------
 #  EXPORTS
 # ---------------------------------------------------------------------------
@@ -112,6 +118,7 @@ var head_rest_basis: Basis
 # ---------------------------------------------------------------------------
 func _ready() -> void:
 	add_to_group("turrets")
+	add_to_group("enemies")
 	player = get_tree().get_first_node_in_group("players")
 	ray.target_position.z = -turret_range
 	

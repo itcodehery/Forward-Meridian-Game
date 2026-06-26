@@ -43,8 +43,8 @@ var vignette_tween: Tween
 var _waypoint_update_timer: float = 0.0
 var _cached_target_wp: Node3D = null
 
-# --- Debug UI ---
-@onready var fps_label = %FPSLabel
+## --- Debug UI ---
+#@onready var fps_label = %FPSLabel
 
 var fade_tween: Tween
 var show_status_duration : float = 4.0
@@ -76,8 +76,25 @@ func _ready():
 	add_to_group("interface")
 	
 	_setup_scanner_ui()
+	_setup_radar_ui()
 	
 	call_deferred("initialize_ui")
+
+# --- Radar UI ---
+var radar_node: Control
+
+func _setup_radar_ui():
+	var radar_scene = preload("res://ui/hud/radar.tscn")
+	if not radar_scene: return
+	
+	radar_node = radar_scene.instantiate()
+	radar_node.name = "Radar"
+	
+	# Top Left Anchors
+	radar_node.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	radar_node.position = Vector2(40, 40) # Margin from top-left
+	
+	%HUD.add_child(radar_node)
 
 func show_hazard_warning(text: String):
 	if not hazard_container: return
@@ -106,7 +123,12 @@ func _setup_scanner_ui():
 	if scanner_scene:
 		scanner_panel = scanner_scene.instantiate()
 		scanner_panel.modulate.a = 0.0
-		%HUD.add_child(scanner_panel)
+		
+		var canvas_layer = CanvasLayer.new()
+		canvas_layer.layer = 10
+		canvas_layer.add_child(scanner_panel)
+		get_tree().current_scene.add_child.call_deferred(canvas_layer)
+		
 		scanner_panel.hide()
 
 var scanner_tween: Tween
@@ -195,17 +217,17 @@ func initialize_ui():
 func _process(delta):
 	stamina_bar.value = lerp(stamina_bar.value, target_stamina, 15.0 * delta)
 	_update_waypoints(delta)
-	Engine.get_frames_per_second() # gives you the average of the last few frames
-	var fps = Engine.get_frames_per_second()
-	fps_label.text = "FPS: " + str(fps)
-	
-	# Change color based on performance
-	if fps >= 60:
-		fps_label.modulate = Color.GREEN
-	elif fps >= 30:
-		fps_label.modulate = Color.YELLOW
-	else:
-		fps_label.modulate = Color.RED
+	#Engine.get_frames_per_second() # gives you the average of the last few frames
+	#var fps = Engine.get_frames_per_second()
+	#fps_label.text = "FPS: " + str(fps)
+	#
+	## Change color based on performance
+	#if fps >= 60:
+		#fps_label.modulate = Color.GREEN
+	#elif fps >= 30:
+		#fps_label.modulate = Color.YELLOW
+	#else:
+		#fps_label.modulate = Color.RED
 
 func _on_stamina_changed(new_value):
 	target_stamina = new_value

@@ -5,6 +5,12 @@ extends CharacterBody3D
 #  States: idle → patrol → alert → search → attack → suppress → disengage
 # =============================================================================
 
+@export_group("Scanner Lore")
+@export var lore_title: String = "Security Drone"
+@export_multiline var lore_text: String = "Standard issue security drone."
+@export var lore_icon: Texture2D
+@export var lore_details: String = "ARMOR: Light | THREAT: Medium"
+
 # ---------------------------------------------------------------------------
 #  EXPORTS
 # ---------------------------------------------------------------------------
@@ -128,6 +134,7 @@ var patrol_waiting: bool        = false
 # ---------------------------------------------------------------------------
 func _ready() -> void:
 	add_to_group("drones")
+	add_to_group("enemies")
 	player = get_tree().get_first_node_in_group("players")
 	current_fire_rate = min_fire_rate
 	ray.target_position = Vector3(0, 0, -detection_range)

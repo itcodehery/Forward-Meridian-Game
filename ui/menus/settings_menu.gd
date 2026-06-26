@@ -10,6 +10,7 @@ var controls_vbox: VBoxContainer
 var ui_components = {} # Store references to dynamic UI elements
 
 func _ready():
+	set_process_input(false)
 	_bind_nodes()
 	_init_ui_state()
 	_build_controls_list()
@@ -29,11 +30,11 @@ func _bind_nodes():
 				tab_container.current_tab = i
 				for b in tab_buttons:
 					b.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
-				btn.add_theme_color_override("font_color", Color("93fd5d"))
+				btn.add_theme_color_override("font_color", Color("ace700"))
 			)
 			
 	if tab_buttons.size() > 0:
-		tab_buttons[0].add_theme_color_override("font_color", Color("93fd5d"))
+		tab_buttons[0].add_theme_color_override("font_color", Color("ace700"))
 	
 	# Find Action Buttons
 	ui_components["save_btn"] = _find_button_by_text(self, "SAVE CHANGES")
@@ -98,7 +99,9 @@ func _bind_nodes():
 	if ui_components["anti_aliasing"]: ui_components["anti_aliasing"].item_selected.connect(func(idx): SettingsManager.anti_aliasing = idx; _mark_unsaved())
 	if ui_components["shadows"]: ui_components["shadows"].item_selected.connect(func(idx): SettingsManager.shadow_quality = idx; _mark_unsaved())
 	if ui_components["sdfgi"]: ui_components["sdfgi"].toggled.connect(func(on): SettingsManager.sdfgi_enabled = on; _mark_unsaved())
-	if ui_components["bloom"]: ui_components["bloom"].toggled.connect(func(on): SettingsManager.bloom_enabled = on; _mark_unsaved())
+	if ui_components["bloom"]:
+		ui_components["bloom"].toggled.connect(func(on): SettingsManager.bloom_enabled = on; _mark_unsaved())
+		ui_components["bloom"].get_parent().hide()
 
 	# Audio Settings
 	ui_components["master_vol"] = _find_option_control("Master Volume")
@@ -248,9 +251,9 @@ func _on_rebind_pressed(action: String, btn: Button):
 	listening_action = action
 	listening_button = btn
 	btn.text = "Press key or mouse button..."
-	set_process_unhandled_input(true)
+	set_process_input(true)
 
-func _unhandled_input(event):
+func _input(event):
 	if listening_action == "": return
 	
 	if event is InputEventKey or event is InputEventMouseButton:
@@ -263,6 +266,7 @@ func _unhandled_input(event):
 				listening_button.text = _get_event_name(listening_action)
 				listening_action = ""
 				listening_button = null
+				set_process_input(false)
 				return
 			
 			InputMap.action_erase_events(listening_action)
@@ -272,3 +276,4 @@ func _unhandled_input(event):
 			listening_button.text = _get_event_name(listening_action)
 			listening_action = ""
 			listening_button = null
+			set_process_input(false)
