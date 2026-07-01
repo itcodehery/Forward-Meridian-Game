@@ -262,9 +262,34 @@ func _do_effects(data: WeaponData):
 
 	if data.muzzle_flash_scene:
 		var flash = data.muzzle_flash_scene.instantiate()
-		slots[current_slot].add_child(flash) 
-		flash.global_position = aim_cast.global_position
-		get_tree().create_timer(0.05).timeout.connect(flash.queue_free)
+		var current_mesh = slots[current_slot].get_child(0) if slots[current_slot].get_child_count() > 0 else null
+		
+		if current_mesh:
+			current_mesh.add_child(flash)
+			var muzzle = current_mesh.find_child("Muzzle*", true, false)
+			if muzzle:
+				flash.global_transform = muzzle.global_transform
+			else:
+				flash.position = Vector3(0, 0.05, -0.6) # Approximate gun tip
+		else:
+			slots[current_slot].add_child(flash) 
+			flash.global_position = aim_cast.global_position
+			
+		if "emitting" in flash:
+			flash.emitting = true
+			
+		# Wait long enough for particles to finish
+		get_tree().create_timer(0.15).timeout.connect(flash.queue_free)
+		
+		# Create a quick dynamic light flash
+		var light = OmniLight3D.new()
+		light.light_color = Color(1.0, 0.8, 0.4)
+		light.light_energy = 3.0
+		light.omni_range = 8.0
+		light.shadow_enabled = true
+		get_tree().current_scene.add_child(light)
+		light.global_position = flash.global_position
+		get_tree().create_timer(0.05).timeout.connect(light.queue_free)
 
 	if current_slot in bloom_levels:
 		bloom_levels[current_slot] = min(data.max_bloom, bloom_levels[current_slot] + data.bloom_per_shot)

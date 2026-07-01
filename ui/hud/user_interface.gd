@@ -492,7 +492,7 @@ func _on_heat_changed(current_heat: float, is_locked: bool):
 	# Our _on_reload_started() Tween takes over here to handle the smooth Red draining animation.
 	if is_locked:
 		return 
-		
+		 
 	# Kill any active tweens so they don't fight our live heat updates
 	if reload_tween and reload_tween.is_valid():
 		reload_tween.kill()

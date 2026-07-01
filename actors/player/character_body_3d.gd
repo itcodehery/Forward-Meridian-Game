@@ -747,14 +747,44 @@ func _update_interaction_target(delta: float):
 				interact_timer += delta
 				if ui and ui.has_method("update_interact_progress"): ui.update_interact_progress(interact_timer / required_time)
 				if interact_timer >= required_time:
-					current_interactable.interact(self)
+					var result = current_interactable.interact(self)
+					if result is Item:
+						_process_item_pickup(result, current_interactable)
 					current_interactable = null
 					interact_timer = 0.0
 			else:
 				interact_timer = 0.0
 				if ui and ui.has_method("update_interact_progress"): ui.update_interact_progress(0.0)
 		else:
-			if Input.is_action_just_pressed("interact"): current_interactable.interact(self)
+			if Input.is_action_just_pressed("interact"): 
+				var result = current_interactable.interact(self)
+				if result is Item:
+					_process_item_pickup(result, current_interactable)
+					current_interactable = null
+
+func _process_item_pickup(item: Item, node: Node):
+	if item.type == Item.ItemType.HEALTH:
+		if health < 100.0:
+			health = min(health + item.value, 100.0)
+			health_changed.emit(health)
+			if health_snd: health_snd.play()
+			
+			if ui and ui.has_method("show_log"): 
+				ui.show_log("PICKED UP: " + item.item_name.to_upper())
+			node.queue_free()
+	elif item.type == Item.ItemType.KEY:
+		if not unlocked_keys.has(item.item_id):
+			unlocked_keys.append(item.item_id)
+			if ui and ui.has_method("show_log"): 
+				ui.show_log("ACQUIRED KEY: " + item.item_name.to_upper())
+				
+			# --- OBJECTIVE LOGIC: SECURITY KEY ---
+			if item.item_name == "Security Key":
+				if SaveManager.game_data.objectives.has("get_key"):
+					if not SaveManager.game_data.objectives["get_key"].done:
+						SaveManager.complete_objective("get_key")
+			
+			node.queue_free()
 
 func _update_ui_prompt():
 	if ui and ui.has_method("set_interaction_prompt"):

@@ -48,7 +48,7 @@ func _ready():
 	
 	SaveManager.register_objective("unlock_d","Unlock Quadrant D")
 	SaveManager.register_objective("find","Find the Package")
-	SaveManager.register_objective("ready","Get Ready for Extraction")
+	SaveManager.register_objective("escape","Escape via the Emergency Exit")
 	
 	# 3. Spawn everything!
 	_spawn_entities()

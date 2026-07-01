@@ -30,9 +30,12 @@ func _ready():
 	
 	# Ensure the slideshow starts visible but the image itself is invisible
 	if slideshow_layer:
-		slideshow_layer.show()
-		image_rect.modulate.a = 0.0
-		bg_rect.modulate.a = 1.0
+		if intro_images.size() > 0:
+			slideshow_layer.show()
+			image_rect.modulate.a = 0.0
+			bg_rect.modulate.a = 1.0
+		else:
+			slideshow_layer.hide()
 	
 	if player:
 		start_intro()

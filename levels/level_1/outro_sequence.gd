@@ -4,6 +4,7 @@ extends CanvasLayer
 @onready var debrief_text = $DebriefText
 @onready var title_image = $TitleImage
 @onready var disclaimer_image = $DisclaimerImage
+@onready var playtester_image = $PlaytestersImage
 
 # --- NEW AUDIO VARIABLES ---
 @export var outro_music: AudioStream
@@ -84,20 +85,6 @@ func start_outro():
 	var bg_darken = create_tween()
 	bg_darken.tween_property(background, "color", Color.BLACK, 1.0)
 	await bg_darken.finished
-	
-	# 5. TITLE LOGO FADE IN/OUT
-	var title_tween = create_tween()
-	title_tween.tween_property(title_image, "modulate:a", 1.0, fade_speed)
-	title_tween.tween_interval(2.0) # Hold it on screen for 2 seconds
-	title_tween.tween_property(title_image, "modulate:a", 0.0, fade_speed)
-	await title_tween.finished
-	
-	# 6. DISCLAIMER IMAGE FADE IN/OUT
-	var disc_tween = create_tween()
-	disc_tween.tween_property(disclaimer_image, "modulate:a", 1.0, fade_speed)
-	disc_tween.tween_interval(5.0) # Hold disclaimer a bit longer
-	disc_tween.tween_property(disclaimer_image, "modulate:a", 0.0, fade_speed)
-	await disc_tween.finished
 	
 	# 7. LOAD MAIN MENU
 	finalize_and_exit()

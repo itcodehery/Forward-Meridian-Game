@@ -61,18 +61,18 @@ func _ready():
 	var menu_vbox = $BackgroundImage/MainMenuState/MenuVBox
 	
 	# Add Save Button dynamically
-	var save_btn = log_button_scene.instantiate()
-	save_btn.text_label = "SAVE GAME"
-	menu_vbox.add_child(save_btn)
-	menu_vbox.move_child(save_btn, 2) 
-	save_btn.pressed.connect(open_save_menu)
+	#var save_btn = log_button_scene.instantiate()
+	#save_btn.text_label = "SAVE GAME"
+	#menu_vbox.add_child(save_btn)
+	#menu_vbox.move_child(save_btn, 2) 
+	#save_btn.pressed.connect(open_save_menu)
 	
 	# Add Load Button dynamically
-	var load_btn = log_button_scene.instantiate()
-	load_btn.text_label = "LOAD GAME"
-	menu_vbox.add_child(load_btn)
-	menu_vbox.move_child(load_btn, 3) 
-	load_btn.pressed.connect(open_load_menu)
+	#var load_btn = log_button_scene.instantiate()
+	#load_btn.text_label = "LOAD GAME"
+	#menu_vbox.add_child(load_btn)
+	#menu_vbox.move_child(load_btn, 3) 
+	#load_btn.pressed.connect(open_load_menu)
 	
 	# Add Settings Button dynamically
 	var settings_btn = log_button_scene.instantiate()
